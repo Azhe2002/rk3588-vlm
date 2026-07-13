@@ -1,0 +1,4 @@
+#!/bin/sh
+killall -9 rk3588-vlm 2>/dev/null
+killall -9 llama-server 2>/dev/null
+echo "rk3588-vlm & llama-server killed"
