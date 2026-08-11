@@ -1,1 +1,6 @@
 build/
+build-arm64/
+build-local/
+test_parser
+experiment/data/*.tgz
+experiment/__pycache__/

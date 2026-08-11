@@ -116,6 +116,7 @@ typedef struct {
     int  width;
     int  height;
     int  interval;
+    int  strict;   /* 1=严格 yes/no 判定(默认)  0=宽泛语义判定 */
 } config_t;
 
 static void print_usage(const char* prog) {
@@ -130,6 +131,7 @@ static void print_usage(const char* prog) {
     printf("  --width    N      采集宽度 (默认: %d, 最大: %d)\n", DEFAULT_WIDTH, MAX_WIDTH);
     printf("  --height   N      采集高度 (默认: %d, 最大: %d)\n", DEFAULT_HEIGHT, MAX_HEIGHT);
     printf("  --interval N      推理间隔秒数 (默认: %d, 最大: %d)\n", DEFAULT_INTERVAL, MAX_INTERVAL);
+    printf("  --strict   N      判定模式: 1=严格yes/no(默认) 0=宽泛语义判定\n");
     printf("  --help            显示帮助\n");
 }
 
@@ -144,6 +146,7 @@ static int parse_args(int argc, char** argv, config_t* cfg) {
     cfg->width    = DEFAULT_WIDTH;
     cfg->height   = DEFAULT_HEIGHT;
     cfg->interval = DEFAULT_INTERVAL;
+    cfg->strict   = 1;   /* 默认严格模式，保持既有行为 */
 
     for (int i = 1; i < argc; i++) {
         const char* opt = argv[i];
@@ -167,6 +170,7 @@ static int parse_args(int argc, char** argv, config_t* cfg) {
         else if (strcmp(opt, "--width")    == 0) ok = parse_int(val, 1, MAX_WIDTH,  &cfg->width,    opt);
         else if (strcmp(opt, "--height")   == 0) ok = parse_int(val, 1, MAX_HEIGHT, &cfg->height,   opt);
         else if (strcmp(opt, "--interval") == 0) ok = parse_int(val, 1, MAX_INTERVAL,   &cfg->interval, opt);
+        else if (strcmp(opt, "--strict")   == 0) ok = parse_int(val, 0, 1,             &cfg->strict,   opt);
         else {
             fprintf(stderr, "未知参数: %s\n", opt);
             print_usage(argv[0]);
@@ -211,6 +215,7 @@ int main(int argc, char** argv) {
     printf("  问题:   %s\n", cfg.question);
     printf("  分辨率: %dx%d\n", cfg.width, cfg.height);
     printf("  间隔:   %ds\n", cfg.interval);
+    printf("  判定:   %s\n", cfg.strict ? "严格 yes/no" : "宽泛语义判定");
     printf("=========================================\n\n");
     printf("[main] 系统提示词:\n  %s\n\n", system_prompt);
     printf("[main] 用户提示词:\n  %s\n\n", cfg.question);
@@ -266,7 +271,7 @@ int main(int argc, char** argv) {
             fprintf(stderr, "  ❌ 推理失败\n");
         } else {
             printf("  📝 原始输出: \"%s\"\n", raw);
-            int result = parse_yes_no(raw);
+            int result = cfg.strict ? parse_yes_no(raw) : parse_yes_no_lenient(raw);
             if (result == 1)      printf("  ✅ 结果: YES (1)\n");
             else if (result == 0) printf("  ⚠️  结果: NO  (0)\n");
             else                  printf("  ❓ 结果: 无法识别 (-1)\n");

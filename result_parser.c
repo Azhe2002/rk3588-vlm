@@ -109,3 +109,80 @@ int parse_yes_no(const char* raw) {
     free(buffer);
     return result;
 }
+
+/* ============================================================
+ * 宽泛判定: parse_yes_no_lenient
+ * 先尝试严格解析; 若 -1, 按语义关键词判断完整句子。
+ * 语义策略: 在整句(小写)中搜索肯定/否定关键词组,
+ *           仅命中一方 → 明确判定; 双方都命中或无命中 → -1。
+ * ============================================================ */
+int parse_yes_no_lenient(const char* raw) {
+    if (!raw || raw[0] == '\0') {
+        return -1;
+    }
+
+    int strict_result = parse_yes_no(raw);
+    if (strict_result != -1) {
+        return strict_result;
+    }
+
+    char* buffer = strdup(raw);
+    if (!buffer) {
+        return -1;
+    }
+    for (char* p = buffer; *p != '\0'; ++p) {
+        *p = (char)tolower((unsigned char)*p);
+    }
+
+    /* 否定关键词组 (完整句子中出现即视为 NO 倾向) */
+    static const char* const negatives[] = {
+        "there is no", "there are no", "there is not", "there are not",
+        "no black", "not present", "not visible", "doesn't", "don't",
+        "isn't", "aren't", "without", "absent", "no fan", "no object",
+        "missing", "not there", "gone", "cannot be seen", "can't be seen",
+        "not found",
+    };
+    /* 肯定关键词组 (完整句子中出现即视为 YES 倾向) */
+    static const char* const positives[] = {
+        "there is a", "there is an", "there are", "is in", "is on",
+        "is located", "is present", "is visible", "shows a", "shows an",
+        "shows the", "contains", "has a", "has an", "appears", "you can see",
+        "can be seen", "found", "sits on", "sitting on", "is sitting",
+    };
+
+    bool negative_hit = false;
+    for (size_t i = 0; i < sizeof(negatives) / sizeof(negatives[0]); ++i) {
+        if (strstr(buffer, negatives[i]) != NULL) {
+            negative_hit = true;
+            break;
+        }
+    }
+
+    bool positive_hit = false;
+    for (size_t i = 0; i < sizeof(positives) / sizeof(positives[0]); ++i) {
+        if (strstr(buffer, positives[i]) != NULL) {
+            positive_hit = true;
+            break;
+        }
+    }
+
+    /* 启发式: 无否定词 + 以 "a/an" 开头的存在性描述句 (省略动词),
+     * 如 "A black fan in a factory warehouse." → YES 倾向
+     * 注意: 不含 "the" 开头 (如 "The image is very dark." 是场景描述, 不应判 YES) */
+    if (!negative_hit && !positive_hit) {
+        if (strncmp(buffer, "a ", 2) == 0
+                || strncmp(buffer, "an ", 3) == 0) {
+            positive_hit = true;
+        }
+    }
+
+    free(buffer);
+
+    if (negative_hit && !positive_hit) {
+        return 0;
+    }
+    if (positive_hit && !negative_hit) {
+        return 1;
+    }
+    return -1;
+}

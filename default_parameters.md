@@ -13,6 +13,7 @@
 | `--width` | `320` | 1 ~ 3840 | 采集宽度 |
 | `--height` | `240` | 1 ~ 2160 | 采集高度 |
 | `--interval` | `15` | 1 ~ 86400 | 推理间隔 (秒) |
+| `--strict` | `1` | 0 ~ 1 | 判定模式: 1=严格 yes/no (默认) 0=宽泛语义判定 |
 
 ## 系统提示词模板
 
@@ -55,7 +56,24 @@ Detection target: {--object}. Scene: {--scene}.
 | `MAX_DIMENSION` | `8192` | 分辨率上限 |
 | `MAX_INTERVAL` | `86400` | 间隔上限 (24h) |
 
+## 判定模式 (--strict)
+
+| 模式 | 判定函数 | 行为 |
+|------|---------|------|
+| `1` (默认) | `parse_yes_no` | 单词边界逐行解析, 只认完整 yes/no 单词 |
+| `0` | `parse_yes_no_lenient` | 先严格解析; 失败后按语义关键词判断完整句子 |
+
+### 宽泛模式 (--strict 0) 语义关键词
+
+- **否定词** → NO: `there is no`, `no black`, `not present`, `missing`, `absent`, `doesn't`, `isn't` 等
+- **肯定词** → YES: `there is a`, `is in`, `is on`, `is located`, `shows a`, `contains`, `sits on` 等
+- **启发式**: 无否定词且以 `a/an` 开头的存在性描述句 → YES (如 "A black fan in a factory warehouse.")
+- 肯定/否定都命中或无命中 → -1 (无法识别)
+
+> 用途: 高分辨率 (640×480) 下模型倾向输出完整句子而非 "yes"/"no",
+> 此时 `--strict 1` 会判 -1, 用 `--strict 0` 可按语义正确判定。
+
 ---
 
 *项目: rk3588-vlm v3*
-*日期: 2026-07-13*
+*日期: 2026-07-13 (更新: 2026-08-07)*

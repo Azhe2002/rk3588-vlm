@@ -12,6 +12,8 @@ rk3588-vlm/
 └── README.md
 ```
 
+*注: 本地开发目录另有 `test_parser.c` (宽泛判定单元测试, 20 用例) 与 `build-arm64-docker.sh` (一键交叉编译脚本)。*
+
 ## 架构
 
 ```
@@ -100,11 +102,24 @@ export LD_LIBRARY_PATH=/userdata/llama/bin
 | `--width` | `320` | 采集宽度 (1~3840) |
 | `--height` | `240` | 采集高度 (1~2160) |
 | `--interval` | `15` | 推理间隔秒数 (1~86400) |
+| `--strict` | `1` | 判定模式: 1=严格 yes/no (默认) 0=宽泛语义判定 |
+
+### 判定模式 (--strict)
+
+- `--strict 1`（默认）：`parse_yes_no` 单词边界逐行解析，只认完整 yes/no 单词 —— 低分辨率 (320×240) 下模型输出合规，推荐。
+- `--strict 0`：`parse_yes_no_lenient` 先严格解析，失败后按语义关键词判断完整句子（`there is a` / `is in` / `no black` / `missing` 等）—— 高分辨率 (640×480) 下模型倾向输出完整句子（如 *"There is a black industrial fan in the center of the image."*），此时严格模式会判 -1，用宽泛模式可按语义正确判定。
+
+```bash
+# 640x480 + 宽泛语义判定
+./rk3588-vlm --width 640 --height 480 --strict 0 \
+  --question "Is there a black industrial fan in the center of the image?"
+```
 
 ## 版本
 
 | 版本 | 日期 | 说明 |
 |------|------|------|
+| v3.1 | 2026-08-07 | 新增 `--strict` 判定模式 (0=宽泛语义判定) + `parse_yes_no_lenient` + 单元测试 |
 | v3 | 2026-07-13 | 持久相机管道 + 常驻 server + 单词边界解析 + 安全信号/参数 |
 | v1 | 2026-07-07 | 初版: shell CLI + 简单解析 |
 
