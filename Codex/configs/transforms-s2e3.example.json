@@ -1,0 +1,40 @@
+{
+  "dataset_id": "s2e3-paired-variants",
+  "profiles": [
+    {"id": "RAW", "kind": "copy", "suffix": ".jpg"},
+    {
+      "id": "REENCODE",
+      "kind": "pillow-reencode",
+      "quality": 95,
+      "subsampling": 0,
+      "suffix": ".jpg"
+    },
+    {
+      "id": "B1",
+      "kind": "pillow-blur",
+      "sigma": 1.0,
+      "quality": 95,
+      "subsampling": 0,
+      "suffix": ".jpg"
+    },
+    {
+      "id": "B3",
+      "kind": "pillow-blur",
+      "sigma": 3.0,
+      "quality": 95,
+      "subsampling": 0,
+      "suffix": ".jpg"
+    },
+    {
+      "id": "SHAM",
+      "kind": "command",
+      "command": [
+        "gst-launch-1.0", "-q",
+        "filesrc", "location={input}", "!", "jpegdec", "!",
+        "videoconvert", "!", "videoconvert", "!",
+        "jpegenc", "quality=95", "!", "filesink", "location={output}"
+      ],
+      "suffix": ".jpg"
+    }
+  ]
+}

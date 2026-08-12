@@ -1,0 +1,39 @@
+{
+  "experiment_id": "S2E1_order",
+  "dataset": "dataset.example.json",
+  "system_prompt": "You are an expert in recognition, processing, and analysis. Please carefully analyze the image and answer the question accurately. Please respond with only 'yes' or 'no'. Detection target: industrial items. Scene: factory warehouse, dim lighting.",
+  "questions": [
+    {
+      "id": "A",
+      "text": "Is there a black industrial fan in the center of the image? Please answer only yes or no."
+    }
+  ],
+  "base_generation": {
+    "temperature": 0.0,
+    "max_tokens": 16,
+    "seed": 17001,
+    "cache_prompt": false,
+    "content_order": "text-image",
+    "constraint": "none"
+  },
+  "conditions": [
+    {
+      "id": "text_image",
+      "generation": {"content_order": "text-image"}
+    },
+    {
+      "id": "image_text",
+      "generation": {"content_order": "image-text"}
+    }
+  ],
+  "server": {
+    "mode": "external",
+    "url": "http://127.0.0.1:8088",
+    "startup_timeout_s": 30,
+    "request_timeout_s": 300
+  },
+  "randomization": {"seed": 20260813, "strategy": "within-frame"},
+  "inter_request_delay_s": 0,
+  "continue_on_error": true,
+  "metadata": {"model": "SmolVLM-256M-Instruct-Q8_0.gguf"}
+}

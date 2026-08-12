@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "dataset_id": "stage2-positive-negative-pilot",
+  "frames": [
+    {
+      "frame_id": "pos_s01_f0001",
+      "path": "../datasets/pilot/frames/pos_s01_f0001.jpg",
+      "ground_truth": "yes",
+      "source_session_id": "capture_s01",
+      "source_width": 640,
+      "source_height": 480,
+      "metadata": {"scene": "fan-present"}
+    },
+    {
+      "frame_id": "neg_s01_f0001",
+      "path": "../datasets/pilot/frames/neg_s01_f0001.jpg",
+      "ground_truth": "no",
+      "source_session_id": "capture_s01",
+      "source_width": 640,
+      "source_height": 480,
+      "metadata": {"scene": "fan-absent"}
+    }
+  ]
+}
