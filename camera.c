@@ -96,25 +96,50 @@ static pid_t start_gstreamer(int* read_fd) {
 
     if (pid == 0) {
         char device_arg[sizeof(g_device) + 16];
-        char pipeline[768];
+        char caps[160];
+        char fps_caps[64];
         (void)snprintf(device_arg, sizeof(device_arg), "device=%s", g_device);
+        (void)snprintf(caps, sizeof(caps),
+                       "video/x-raw,format=NV12,width=%d,height=%d", g_width, g_height);
+        (void)snprintf(fps_caps, sizeof(fps_caps),
+                       "video/x-raw,framerate=%d/1", CAMERA_FPS);
 
-        // 整条管道拼成单个字符串传给 gst-launch-1.0。
-        // g_fx_extra 插入 jpegenc 之前 (元素串内勿含空格; 需要带空格/引号的
-        // caps 请用单引号包裹，如 videoscale ! video/x-raw,width=320,height=240)。
-        int n = snprintf(pipeline, sizeof(pipeline),
-            "v4l2src %s ! video/x-raw,format=NV12,width=%d,height=%d"
-            " ! videorate drop-only=true ! video/x-raw,framerate=%d/1"
-            "%s%s"
-            " ! jpegenc ! fdsink fd=1 sync=false",
-            device_arg, g_width, g_height, CAMERA_FPS,
-            g_fx_extra[0] ? " ! " : "", g_fx_extra);
+        // 板端 gst-launch-1.0 1.18.5 对"单个字符串"管道描述解析有 bug
+        // (一律报语法错误，实测 fakesrc 亦失败)，必须用多参数 argv 形式
+        // (v0.1 已验证稳定)。g_fx_extra 按空白拆分成独立 token 插在 jpegenc 之前；
+        // 带空格/引号的 caps 请用单引号包裹 (如 videoscale ! 'video/x-raw,width=320,height=240')，
+        // 引号随 token 传入由 gst-launch 解析。
+        char* argv[64];
+        int argc = 0;
+        argv[argc++] = (char*)"gst-launch-1.0";
+        argv[argc++] = (char*)"-q";
+        argv[argc++] = (char*)"v4l2src";
+        argv[argc++] = device_arg;
+        argv[argc++] = (char*)"!";
+        argv[argc++] = caps;
+        argv[argc++] = (char*)"!";
+        argv[argc++] = (char*)"videorate";
+        argv[argc++] = (char*)"drop-only=true";
+        argv[argc++] = (char*)"!";
+        argv[argc++] = fps_caps;
 
-        if (n < 0 || (size_t)n >= sizeof(pipeline)) {
-            static const char message[] = "[camera] GStreamer 管道串过长\n";
-            (void)write(STDERR_FILENO, message, sizeof(message) - 1U);
-            _exit(128);
+        if (g_fx_extra[0]) {
+            argv[argc++] = (char*)"!";
+            char* saveptr = NULL;
+            char* tok = strtok_r(g_fx_extra, " \t\n", &saveptr);
+            while (tok != NULL && argc < 57) {  /* 留足后缀 6 + NULL */
+                argv[argc++] = tok;
+                tok = strtok_r(NULL, " \t\n", &saveptr);
+            }
         }
+
+        argv[argc++] = (char*)"!";
+        argv[argc++] = (char*)"jpegenc";
+        argv[argc++] = (char*)"!";
+        argv[argc++] = (char*)"fdsink";
+        argv[argc++] = (char*)"fd=1";
+        argv[argc++] = (char*)"sync=false";
+        argv[argc] = NULL;
 
         close(pipefd[0]);
         if (dup2(pipefd[1], STDOUT_FILENO) < 0) {
@@ -122,7 +147,7 @@ static pid_t start_gstreamer(int* read_fd) {
         }
         close(pipefd[1]);
 
-        execlp("gst-launch-1.0", "gst-launch-1.0", "-q", pipeline, (char*)NULL);
+        execvp("gst-launch-1.0", argv);
 
         static const char message[] = "[camera] 无法执行 gst-launch-1.0\n";
         (void)write(STDERR_FILENO, message, sizeof(message) - 1U);
