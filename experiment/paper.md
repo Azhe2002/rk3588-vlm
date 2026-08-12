@@ -1,14 +1,15 @@
 # Input Resolution-Dependent Collapse of Output-Format Instruction Following in Small Vision-Language Models
 
-> **状态**: 材料草稿 v0.1 — 实验小助手整理，供研究讨论与扩展
-> **日期**: 2026-08-07
+> **状态**: 材料草稿 v0.2 — 实验小助手整理，供研究讨论与扩展
+> **日期**: 2026-08-12
 > **研究问题**: 为什么 640×480 输入分辨率下，"yes/no 强约束"在 SmolVLM 系列小模型中会失效？
+> **v0.2 更新**: 数据全部替换为大样本复现（≥27 轮/组）；新增分辨率梯度 12 组、问题措辞变体实验（实验5）；llama.cpp 版本核实为 7af4279 并修正预处理机制假设；新增"静态图 vs 实时帧"对照；实验4（跨模型）因板端无外网删除。
 
 ---
 
 ## 摘要 (Abstract)
 
-指令遵循（instruction following）是视觉语言模型（VLM）在受控自动化场景中可靠部署的关键能力，其中要求模型输出严格受限格式（如仅输出 "yes"/"no"）的任务尤其依赖该能力。本文报告一个**反直觉且可复现的实验现象**：在两个小规模视觉语言模型（SmolVLM-256M / SmolVLM-500M）上，将输入图像分辨率从 320×240 提升至 640×480 后，模型对 "Please answer only yes or no" 这一显式输出格式约束的遵循率从 **90–100% 骤降至 0–10%**，且**强化 prompt 措辞（严厉版本）无法恢复合规输出**。同时，模型的**语义判断能力保持稳定**（90–100% 正确识别目标是否存在），说明失效发生在"输出格式控制"层面而非"感知/推理"层面。本文系统记录实验流程、原始数据，并提出机制假设——包括视觉 token 数量膨胀导致的指令注意力稀释、分辨率相关的 patch 化表征偏移、以及小模型容量限制下的指令-视觉竞争——供后续受控实验验证。
+指令遵循（instruction following）是视觉语言模型（VLM）在受控自动化场景中可靠部署的关键能力，其中要求模型输出严格受限格式（如仅输出 "yes"/"no"）的任务尤其依赖该能力。本文报告一个**反直觉且可复现的实验现象**：在两个小规模视觉语言模型（SmolVLM-256M / SmolVLM-500M）上，输入分辨率从 320×240 提升到 640×480 后，对 "Please answer only yes or no" 显式输出格式约束的遵循率出现**突变式崩塌**——256M 从 100% 降至 36%，500M 直接归零；分辨率继续提升至 800×600 时两者均归零。崩塌不是平滑渐变：480×360 时两模型均 100% 合规，640×480 突然断裂。**格式合规与语义判断解耦**：高分辨率下两模型的语义判断保持正确（目标存在性识别 100%），但输出从单词变为完整句子；反之，500M 在低分辨率（320×240）下格式完全合规而**语义判断在 yes/no 间摇摆**（跨会话 yes 率 41%↔95%，幅度不稳定）。额外发现：该现象**仅能通过板端实时相机帧链路复现**，同一场景的静态图像不能复现；强化措辞（严厉 prompt）无法恢复合规输出，6 种问题措辞变体中 4 种无效甚至显著更差，但 "Does the image contain...?" 句式将遵循率显著恢复至 82%（p<0.01）——说明问题框架（探测式 vs 位置断言式）影响格式遵循，机制待研究。本文系统记录实验流程与原始数据，并提出机制假设——包括视觉细节驱动下的描述先验激活（H2）、小模型容量下的感知-指令竞争（H3），以及被新数据弱化的视觉 token 膨胀假设（H1）——供后续受控实验验证。
 
 **关键词**: Vision-Language Models; Instruction Following; Output Format Control; Input Resolution; Edge Deployment; SmolVLM
 
@@ -22,17 +23,21 @@
 
 ### 1.2 问题陈述
 
-在 RK3588S 板端部署实验中发现：当输入分辨率从 320×240 提升到 640×480 时，SmolVLM 系列模型输出的格式约束遵循行为发生**崩塌式退化**：
+在 RK3588S 板端部署实验中发现：当输入分辨率从 320×240 提升到 640×480 时，SmolVLM 系列模型输出的格式约束遵循行为发生**崩塌式退化**（大样本复现，每组 ≥27 轮）：
 
-| 分辨率 | 严格格式遵循率（两模型） | 语义正确率（两模型） |
-|--------|------------------------|---------------------|
-| 320×240 | 90–100% | 90–100% |
-| 640×480 | **0–10%** | **90–100%** |
+| 模型 | 320×240 | 640×480 | 800×600 |
+|------|---------|---------|---------|
+| SmolVLM-256M 格式遵循 | **100%** (45/45) | **36%** (16/44) | **0%** (0/32) |
+| SmolVLM-500M 格式遵循 | 100% (39/39) | **0%** (0/36) | **0%** (0/27) |
+
+两模型在崩塌分辨率下的**语义判断均保持正确**（风扇存在性识别 100%），说明失效发生在"输出格式控制"层面而非"感知/推理"层面。
 
 这一现象**不能**由以下平凡因素解释：
 - 不是解析器 bug（原始输出直接可见，确实从 "Yes." 变为完整句子）
 - 不是感知能力退化（语义判断始终正确）
-- 不是 prompt 强度不足（严厉 prompt 无效，见 §5.4）
+- 不是 prompt 强度不足（严厉 prompt 无效，见 §4.3；6 种措辞变体仅探测式 "Does the image contain...?" 恢复遵循，其余无效或更差，见 §4.4）
+- 不是 KV cache 命中假象（每轮取新帧，实测无缓存命中，见 §4.7）
+- 不是场景/光照混杂（全程亮度恒定 123-126、帧间差 0.4-0.95，见 §5.4）
 
 ### 1.3 研究目标
 
@@ -43,8 +48,10 @@
 ### 1.4 贡献
 
 - **现象报告**: 首个在小模型 VLM 上系统报告"输入分辨率→输出格式遵循崩塌"的实证研究（据我们所知）
+- **突变点定位**: 通过分辨率梯度实验（160×120 至 1280×960 共 12 组）定位崩塌触发区间（480×360 → 640×480），非平滑渐变
+- **格式-语义解耦**: 揭示"高分辨率：格式崩语义稳；低分辨率：格式稳语义摇"的能力权衡图景
 - **完整流程**: 可复现的板端实验协议（相机采集→常驻推理→逐帧评估）
-- **负结果**: 强化 prompt 无法修复格式遵循（排除 prompt 工程路线）
+- **负结果与正结果**: 强化 prompt 无效；措辞变体多数无效甚至更差，但 "Does the image contain...?" 句式显著恢复（45%→82%, p<0.01）——提示问题框架（探测式 vs 位置断言式）是有效干预面
 - **机制框架**: 三种可检验假设 + 实验设计
 
 ---
@@ -57,11 +64,11 @@
 
 ### 2.2 小模型的能力边界
 
-小模型（<1B）在指令遵循上存在已知容量瓶颈（Zhou et al., 2024），多任务竞争（感知 vs. 指令）时可能顾此失彼。本文现象可能是该瓶颈的输入敏感型表现。
+小模型（<1B）在指令遵循上存在已知容量瓶颈（Zhou et al., 2024），多任务竞争（感知 vs. 指令）时可能顾此失彼。本文现象可能是该瓶颈的输入敏感型表现，且 500M 与 256M 的不同行为模式（低分辨率语义摇摆 vs 高分辨率格式崩塌）为"容量分配权衡"提供了直接观察。
 
 ### 2.3 视觉编码与分辨率
 
-现代 VLM（如 SmolVLM、LLaVA、Qwen2-VL）将图像切分为 patch 并投影为视觉 token。分辨率提升直接导致**视觉 token 数量增加**（SmolVLM 中 320×240 → 640×480 使有效 patch 数倍增），改变注意力分布与指令 token 的相对权重——这构成本文假设 H1 的基础。
+现代 VLM（如 SmolVLM、LLaVA、Qwen2-VL）将图像切分为 patch 并投影为视觉 token。**版本敏感点**：llama.cpp 旧版（v0.15.3 早期）对 SmolVLM 按输入分辨率动态切分 patch，视觉 token 数随分辨率增加；而我们板端实际运行的版本（commit 7af4279，v0.15.3 系后段）的 mtmd 多模态预处理对 SmolVLM 采用 **fixed_size 模式**——输入统一 resize 到固定 512×512 后切分，**视觉 token 数恒定、与输入分辨率无关**。因此早期版本基于"token 数随分辨率倍增"的假设 H1 在本实验版本下被显著弱化（详见 §6），分辨率的影响应归于图像内容（细节/纹理）而非 token 数量。
 
 ### 2.4 边缘部署中的 VLM
 
@@ -78,8 +85,11 @@ RK3588 类设备上部署 VLM（llama.cpp 生态）的工程实践已有大量�
 | SoC | Rockchip RK3588S |
 | OS | Debian 11 (Bullseye), GLIBC 2.31 |
 | RAM | 7.7 GB |
-| 推理引擎 | llama.cpp v0.15.3（CPU，arm64） |
+| 推理引擎 | llama.cpp commit **7af4279**（二进制 soname v0.15.3 系，CPU，arm64；含新版 mtmd 多模态预处理，SmolVLM 采用 fixed_size 512×512 模式） |
 | 相机 | /dev/video22, MIPI CSI, 最大 3840×2160, NV12 |
+| 网络 | 板端无外网（离线部署，实验4 跨模型方案因此不可行） |
+
+**版本核实说明**：早期报告记为 "llama.cpp v0.15.3"。板端核实（git 版本串 + 行为测试）确认实际为 commit 7af4279，其 mtmd 视觉预处理对 SmolVLM 采用 fixed_size 模式（512×512 统一 resize，视觉 token 数恒定）。该差异直接影响机制解释（§6），论文必须以实际版本为准。
 
 ### 3.2 模型
 
@@ -105,85 +115,135 @@ V4L2 相机 (持久管道, 5fps, 内存帧)
 - 每轮**重新取帧**（JPEG 内容逐帧变化）→ 杜绝 KV cache 命中，保证测量真实推理耗时
 - 模型常驻 → 排除模型加载时间（首轮除外）
 - 原始输出全文记录 → 事后可人工/语义判定
+- 每轮从 `/dev/shm/frame.jpg` 采样副本（SAMPLE 模式）→ 事后帧特征分析（亮度/模糊/帧间差），排除场景混杂变量
 
 ### 3.4 实验任务
 
 - **检测问题 (用户 prompt)**: `Is there a black industrial fan in the center of the image? Please answer only yes or no.`
 - **系统提示词**: `You are an expert in recognition... Please respond with only 'yes' or 'no'. Detection target: industrial items. Scene: factory warehouse, dim lighting.`
 - **严厉 prompt 版本**: `Is there a black industrial fan in the center of the image? You must answer with exactly one word, either "yes" or "no". No other text, no punctuation, no explanation.`
-- **场景**: 黑色工业风扇置于室内（仓库/厂房，暗光），画面静止
+- **场景**: 黑色工业风扇置于室内（仓库/厂房，暗光），画面静止；实验全程亮度 123-126、帧间差 0.4-0.95（无运动/光照变化）
 - **推理参数**: temperature=0.1, max_tokens=32, 单请求超时 300s
 
 ### 3.5 实验矩阵
 
-2 模型 × 2 分辨率 × 2 prompt 强度 = 6 组实验（320×240 仅测普通 prompt；640×480 测普通 + 严厉），每组 10 轮（部分组跑到 20+ 轮）。
+三组实验：
+
+| 实验 | 内容 | 组数 | 每轮时长 | 数据文件 |
+|------|------|------|---------|---------|
+| 复现实验 | 2 模型 × 2 分辨率（320/640），大样本 | 4 | 180s（≥27 轮） | `exp_{model}_{res}.log` |
+| 实验1 分辨率梯度 | 2 模型 × 6 分辨率（160/320/480/640/800/1280） | 12 | 180s（≥27 轮） | `exp1_*.log` |
+| 实验5 问题措辞 | 256M@640 基线 + 5 种措辞变体（B-F）+ 500M@320 延长（G） | 7 | 180-240s | `exp5_*.log` |
+| （初版数据） | 2 模型 × 2 分辨率 × 2 prompt 强度（普通/严厉） | 6 | 10 轮/组 | `experiment-smolvlm*.md` |
+
+每组独立 exec（<5 分钟超时上限），逐组拉回日志与帧采样；实验5 仅 A 组做帧采样（时间效应分析）。
 
 ### 3.6 评估指标
 
 | 指标 | 定义 |
 |------|------|
-| 严格格式遵循率 | 原始输出为严格 "yes"/"no"（单词边界解析 `parse_yes_no` 返回 1/0）的轮次占比 |
-| 语义判定正确率 | 人工/关键词判定输出语义是否为正确答案的轮次占比 |
+| 格式遵循率（格式合规） | 原始输出为严格 "yes"/"no" **单词**的轮次占比（`parse_yes_no` 单词边界解析 + 输出形态分类"单词/句子"） |
+| 语义判定 | 关键词/人工判定输出语义是 yes（"there is / a black industrial fan / yes"）还是 no；报告 yes 轮占比 |
 | 端到端单帧耗时 | 取帧→推理→返回 的墙钟时间（秒） |
 | 输出类型分布 | 严格单词 / 完整句子 / 其他 的分布 |
+
+**口径说明**：早期报告中的"严格遵循"列指 C 程序 `parse_yes_no` 判定为 YES 的轮次（= 格式合规 × 语义 yes 的复合指标）。本文以**格式遵循率（单词率）**为主指标，语义 yes 率单独报告，两者解耦呈现。
 
 ---
 
 ## 4. 结果 (Results)
 
-### 4.1 现象一：分辨率提升导致格式遵循崩塌
+### 4.1 复现实验：分辨率提升导致格式遵循崩塌（大样本确认）
 
-**表 1. 六组实验总览**（10 轮/组）
+**表 1. 复现实验 4 组**（板端实时相机帧，每组独立运行）
 
-| # | 模型 | 分辨率 | Prompt | 平均耗时 | 严格遵循 | 语义正确 | 输出形态 |
-|---|------|--------|--------|---------|---------|---------|---------|
-| 1 | 256M | 320×240 | 普通 | 5.49s | **100%** (10/10) | 100% | "Yes." |
-| 2 | 500M | 320×240 | 普通 | 6.18s | **90%** (9/10) | 90% | "Yes." |
-| 3 | 256M | 640×480 | 普通 | 5.69s | **10%** (1/10) | 90% | 完整句子 |
-| 4 | 500M | 640×480 | 普通 | 6.67s | **0%** (0/10) | 100% | 完整句子 |
-| 5 | 256M | 640×480 | 严厉 | 5.74s | **10%** (1/10) | 100% | 完整句子 |
-| 6 | 500M | 640×480 | 严厉 | 6.58s | **0%** (0/10) | 100% | 完整句子 |
+| 模型 | 分辨率 | 轮次 | 格式遵循 | 语义 yes | 输出形态 |
+|------|--------|------|---------|---------|---------|
+| 256M | 320×240 | 45 | **100%** (45/45) | 100% | 全单词 "Yes." |
+| 256M | 640×480 | 44 | **36%** (16/44) | 100% | 16 单词 + 28 句子 |
+| 500M | 640×480 | 36 | **0%** (0/36) | 100% | 全描述性句子 |
+| 500M | 320×240 | 39 | 100% (39/39) | **41% (16/39)** | 全单词 |
 
 **核心发现**：
-- 分辨率 320×240 → 640×480 时，严格格式遵循从 90–100% 崩塌至 0–10%
-- 语义正确率保持 90–100% —— **感知/推理能力未受损**
-- 256M 组（#1 vs #3）：遵循率 100% → 10%；500M 组（#2 vs #4）：90% → 0%
+- 640×480 下 256M 格式遵循降至 36%、500M 归零，**语义判断全部正确**（感知/推理未受损）
+- **500M@320×240 出现"语义摇摆"**：格式 100% 合规但 39 轮中 16 轮 yes、23 轮 no（41%）；次日延长组（实验5 G 组，39 轮）yes 率 95%——**摇摆真实存在但幅度跨会话不稳定**，低分辨率下 500M 感知判断对环境微差敏感（格式合规则跨会话稳定）
+- 256M@640 组存在组内时间变化（前/中/后段 3/14 → 3/15 → 10/15），但同期独立基线组无此规律，判定为当次个体现象而非系统性时间漂移
 
-### 4.2 现象二：严厉 prompt 无法恢复合规
+### 4.2 实验1：分辨率梯度定位崩塌区间（突变非渐变）
 
-将 prompt 强化为 "You must answer with exactly one word... No other text, no punctuation, no explanation." 后：
-- 256M @ 640×480: 遵循率仍为 10%（#5 ≈ #3）
-- 500M @ 640×480: 遵循率仍为 0%（#6 = #4）
+**表 2. 分辨率梯度 12 组**（6 档分辨率 × 2 模型；每格格式遵循率）
+
+| 模型 | 160×120 | 320×240 | 480×360 | 640×480 | 800×600 | 1280×960 |
+|------|---------|---------|---------|---------|---------|----------|
+| 256M 格式遵循 | 100% (34/34) | **100%** (45/45) | **100%** (33/33) | **36%** (16/44) | **0%** (0/32) | 3% (1/32) |
+| 256M 语义 yes | 0% (全 "No.") | 100% | 100% | 100% | 100% | 100% |
+| 500M 格式遵循 | 100% (29/29) | 100% (39/39) | 83% (24/29) | **0%** (0/36) | **0%** (0/27) | 0% (0/27) |
+| 500M 语义 yes | 3% (1/29) | 41% (16/39) | 31% (9/29) | 100% | 100% | 100% |
+
+（256M@1280 出现 1 轮单词输出；两模型 @1280 语义均 100% yes，输出全为描述性句子）
+
+**关键结论**：
+1. **崩塌存在触发阈值而非平滑渐变**（256M 最清晰）：480×360 (100%) → 640×480 (36%) → 800×600 (0%)
+2. **500M 漂移更早且部分化**：480×360 已出现 5/29 轮句子输出（"Yes, there is..." 部分漂移形态）
+3. **低分辨率感知失败是诚实回答，非幻觉**：160×120 两模型格式 100% 合规但几乎全答 "No."（看不清→诚实否定）
+4. **500M 语义判断随分辨率单调改善**：160 全 No.（感知失败）→ 320/480 摇摆（41%/31%）→ 640+ 稳定 100%——与 256M 的"感知恒稳"形成对照，支持容量/复杂度相关解释
+5. 耗时几乎不变（5.4-6.9s）→ 与 fixed_size 预处理（token 数恒定）一致，见 §4.6
+
+### 4.3 现象二：严厉 prompt 无法恢复合规
+
+初版实验（10 轮/组）将 prompt 强化为 "You must answer with exactly one word... No other text, no punctuation, no explanation." 后：
+- 256M @ 640×480: 遵循率仍为 10%（严厉 ≈ 普通）
+- 500M @ 640×480: 遵循率仍为 0%（严厉 = 普通）
 
 **结论**：格式遵循的崩塌**不随 prompt 措辞强度变化**，暗示机制性因素（输入表征）而非指令表述不足。
 
-### 4.3 输出形态分析
+### 4.4 现象三：问题措辞变体无法恢复合规（实验5）
 
-640×480 下模型倾向输出**完整的描述性句子**，且内容上正确回答（存在性确认）：
+实验5 在 256M@640×480 崩塌条件下，用 6 种问题措辞变体测试格式遵循是否随措辞恢复（每组 ≥27 轮）：
 
-| 模型 | 典型输出 |
-|------|---------|
-| 256M @ 640×480 | "There is a black industrial fan in the center of the image." |
-| 500M @ 640×480 | "A black industrial fan is in the foreground of the image." / "A black industrial fan sits on a table in a factory warehouse." |
+| 组 | 措辞（要点） | 轮次 | 格式遵循 | vs A（Fisher 双侧） | 语义 yes |
+|----|-------------|------|---------|---------------------|---------|
+| A 基线 | "Is there a black industrial fan in the **center of the image**? Please answer only yes or no." | 33 | **45%** (15/33) | — | 100% |
+| B | "Is there a black industrial fan in the image?"（**去掉 center**） | 33 | **3%** (1/33) | p=0.0001 | 100% |
+| C | "Is there an industrial fan?"（去掉黑色/中心，最简） | 33 | 33% (11/33) | p=0.45（不显著） | 100% |
+| D | "**Does the image contain** a black industrial fan?" | 33 | **82%** (27/33) | p=0.004 | 100% |
+| E | 约束放**句首** "Please answer only yes or no. Is there..." | 32 | 9% (3/32) | p=0.002 | 100% |
+| F | 加**示例** "...? Example: Yes." | 32 | 16% (5/32) | p=0.015 | 100% |
+| G | 500M@320×240 延长跑（语义稳定性） | 39 | 100% (39/39) | — | **95%** (37/39) |
 
-**注意**：500M 在 640×480 下还表现出"位置描述更具体"（foreground/on a table），说明模型在高分辨率下确实利用了更多视觉细节——这为假设 H2（信息量驱动）提供初步支持。
+**关键结论**：
+- **A 组基线 15/33 (45%) 与复现组 36% 一致 → 现象稳定可复现**；时间块 5/11→4/11→6/11 无系统性时间漂移（排除"越跑越崩"假象）
+- **措辞有显著影响，但方向非平凡**：D 组 "Does the image contain...?" 显著恢复格式遵循（45%→82%, p<0.01）；B 组去掉 "in the center" 反而崩塌更彻底（45%→3%, p<0.001）；E 组约束前置更差（9%）、F 组示例无效（16%）
+- **B 组结果反向证伪 H4 的"位置假设冲突"解读**：去掉位置假设不但未恢复、反而崩塌更彻底——问题的"探测式 vs 位置断言式"框架（D vs A）比位置词本身更关键
+- **G 组（500M@320 延长跑）**: 格式 39/39 合规，语义 yes 率 95%——与复现组当日 41% 形成跨会话对比（8-10 实验 vs 8-12 实验）→ **500M@320 的"语义摇摆"真实存在但幅度跨会话不稳定**（41%↔95%），格式合规则始终稳定；低分辨率下 500M 的感知判断对会话间环境微差敏感
 
-### 4.4 耗时数据（性能维度）
+### 4.5 输出形态分析
 
-**表 2. 端到端单帧耗时**（10 轮均值）
+崩塌分辨率下模型输出**完整的描述性句子**，且内容上正确回答（存在性确认），但两种模型漂移形态不同：
 
-| 对比 | 数值 | 说明 |
-|------|------|------|
-| 256M @ 320×240 | 5.49s | 基准 |
-| 500M @ 320×240 | 6.18s | 大 11% |
-| 256M @ 640×480 | 5.69s | 分辨率 ↑ 仅慢 4% |
-| 500M @ 640×480 | 6.67s | 分辨率 ↑ 慢 8% |
+| 模型 | 典型输出 | 形态 |
+|------|---------|------|
+| 256M @ 640×480 | "There is a black industrial fan in the center of the image." | 回答式句子（陈述句回答） |
+| 500M @ 640×480 | "A factory warehouse scene with a black industrial fan in the center." / "A black industrial fan is in the foreground of the image." | **描述性句子**（场景描述先验） |
 
-**关键洞察**：分辨率提升（像素 ×4）仅带来 4–8% 耗时增加 → 耗时瓶颈是**视觉编码固定开销（~4.5s）**，而非 token 数或生成长度。这为假设 H1（视觉 token 数量）提供一个反证线索——若 token 数量是主因，耗时应有更显著增长（见 §6 讨论）。
+500M 在 640×480 下输出 "foreground"/"on a table"/"warehouse scene" 等**更具体的位置与场景信息**，说明模型在高分辨率下确实利用了更多视觉细节——为假设 H2（信息量/细节驱动）提供直接支持。
 
-### 4.5 对照实验：KV cache 假象
+### 4.6 耗时数据：token 数恒定
 
-固定图片连续 10 次请求时，第 1 次 5.75s、第 2–10 次仅 0.07–0.13s——这是 llama-server 的 KV cache/prompt cache 命中，**不代表真实逐帧性能**。本论文所有数据均使用逐帧新图测量，规避此陷阱。
+**表 3. 端到端单帧耗时**（组均值）
+
+| 模型 | 分辨率范围 | 耗时范围 |
+|------|-----------|---------|
+| 256M | 160×120 ~ 1280×960 | 5.4-5.8s |
+| 500M | 160×120 ~ 1280×960 | 6.2-6.9s |
+
+分辨率从 160×120 到 1280×960（像素 ×64）耗时几乎不变 → 与 llama.cpp 7af4279 的 **fixed_size 预处理（统一 resize 512×512，视觉 token 数恒定）** 完全一致。这直接**证伪 H1（token 膨胀假设）在本版本下的适用性**：token 数根本不随分辨率变化，崩塌必然另有机制（§6）。
+
+### 4.7 对照实验：KV cache 假象 + 静态图不复现
+
+**KV cache 对照**：固定图片连续 10 次请求时，第 1 次 5.75s、第 2–10 次仅 0.07–0.13s——llama-server 的 prompt/KV cache 命中假象。本论文所有数据均使用逐帧新图测量，规避此陷阱。
+
+**静态图对照（关键差异）**：将同一场景的静态 JPEG 反复送入板端服务器（无新帧），256M@640 格式遵循 **10/10 全部合规**——与实时相机帧链路的 36% 形成鲜明对比。同一模型、同一图像内容、同一分辨率下，**静态图不复现、实时帧才复现**。可能原因：a) 静态图测试时 prompt cache 命中（请求内容相同），模型按缓存路径输出；b) 实时链路每轮新帧的内容微差（JPEG 噪声/编码差异）触发不同采样路径。结论：**变体实验必须走实时链路，静态图实验不可信**。
 
 ---
 
@@ -195,6 +255,8 @@ V4L2 相机 (持久管道, 5fps, 内存帧)
 # 模型推送 (SFTP)
 /userdata/llama/models/SmolVLM-{256M,500M}-Instruct-Q8_0.gguf
 /userdata/llama/models/mmproj-SmolVLM-{256M,500M}-Instruct-Q8_0.gguf
+# 二进制
+/userdata/llama/bin/{llama-server, libllama-server-impl.so, rk3588-vlm}
 ```
 
 ### 5.2 运行命令
@@ -211,16 +273,24 @@ export LD_LIBRARY_PATH=/userdata/llama/bin
   --question "Is there a black industrial fan in the center of the image? Please answer only yes or no."
 ```
 
+批量实验用 `board_exp_run.sh <model> <mmproj> <w> <h> <secs> "<question>" <log> [sample]`（自动起 server → 跑 N 秒 → 帧采样 → 杀 server），驱动脚本 `run_exp1.py` / `run_exp5.py`。
+
 ### 5.3 数据记录
 
 - 每轮输出：轮次号、原始输出全文、程序判定、端到端耗时
-- 板端日志：`/tmp/main_vlm*.log`（6 份，每组实验一份）
-- 本地汇总：`experiment-smolvlm*.md`（6 份）+ `report.md`
+- 日志存放：板端 `/tmp/*.log` → 拉回本地 `experiment/data/exp*.log`（逐组）
+- 帧采样：`/tmp/frames_<tag>/f_*.jpg`（每 2s 一张）→ `experiment/data/exp*_*.tgz`
+- 统计脚本：`analyze.py`（严格判定/语义/输出类型/耗时）、`frame_analysis.py`（亮度/模糊/JPEG 体积/帧间差/轮次相关性）
 
-### 5.4 判定函数
+### 5.4 场景稳定性监控
+
+实验期间场景静止：所有组亮度 123-126、帧间差 0.4-0.95（唯一例外 500M@800×600 组 0.75，可能有人经过），排除光照/运动对结果的混杂影响。
+
+### 5.5 判定函数
 
 - **严格判定** `parse_yes_no()`: 单词边界逐行解析，仅完整 "yes"/"no" 单词算命中
 - **语义判定** `parse_yes_no_lenient()`: 严格失败后按语义关键词（"there is a", "no black" 等）判断
+- **输出形态分类**: `analyze.py` 按原始输出正则分为 word / sentence / other
 
 ---
 
@@ -228,35 +298,41 @@ export LD_LIBRARY_PATH=/userdata/llama/bin
 
 ### 6.1 观察到的规律
 
-1. 格式遵循崩塌与**分辨率**强相关，与 **prompt 强度**无关
-2. 语义正确率始终高企 → 失效限于"输出格式控制"环节
-3. 高分辨率下模型输出**更长、更具体**的描述 → 模型"有更多话要说"
+1. 格式遵循崩塌与**分辨率**强相关（突变点 480→640 之间），与 **prompt 强度/措辞**无关
+2. 语义正确率在高分辨率下始终高企 → 失效限于"输出格式控制"环节
+3. **能力权衡图景**：500M 低分辨率下格式稳语义摇（感知不稳定），高分辨率下格式崩语义稳（感知充分但描述先验压过格式指令）
+4. 崩塌分辨率下模型输出**更长、更具体**的描述 → 模型"有更多话要说"
+5. 实时帧链路复现、静态图不复现 → 现象对输入链路敏感
 
 ### 6.2 候选机制假设
 
-#### H1: 视觉 token 膨胀 → 指令注意力稀释
-分辨率提升 → patch 数倍增 → 视觉 token 数量显著增加 → 在注意力层中，指令 token（"answer only yes or no"）的相对注意力权重被大量视觉 token 稀释 → 生成阶段指令影响力下降。
-**初步反证**：若 token 数量是主因，耗时应有超线性增长，但实测仅 +4–8%（§4.4）。不过耗时的瓶颈在编码器，注意力稀释可能不反映在总耗时上——仍需显式测量注意力分布验证。
+#### H1: 视觉 token 膨胀 → 指令注意力稀释 （已证伪/弱化）
+早期版本（v0.15.3 早期动态切分）下，分辨率提升 → patch 数倍增 → 视觉 token 显著增加 → 指令 token 相对注意力被稀释。**本版本（7af4279, fixed_size）下已被证伪**：视觉 token 数恒定（统一 512×512），耗时实测恒定（5.4-6.9s 与分辨率无关）。在本实验平台上 H1 不成立——崩塌的机制在 token 数之外。
 
-#### H2: 信息量/细节驱动 → 描述先验被激活
+#### H2: 信息量/细节驱动 → 描述先验被激活（当前主要假设）
 高分辨率图像携带更多可识别细节（纹理、位置、背景）→ 模型训练分布中"详细描述"先验被激活，压过"单字回答"指令 → 输出形态由任务先验主导。
-**初步支持**：500M 在 640×480 下输出 "foreground"/"on a table" 等更具体信息（§4.3）。
+**支持证据**：a) 500M@640 输出 "foreground"/"warehouse scene" 等细节性描述；b) 500M 语义随分辨率单调改善（160 全 No. → 320/480 摇摆 → 640+ 稳定 100%）说明高分辨率确实带来更强的视觉证据；c) 实时帧与静态图的差异与该假设兼容（实时帧内容微差 → 采样路径多变）。
+**待验证**：实验2/3（GStreamer 模糊/缩放/裁剪滤镜）将直接检验"细节消除→遵循恢复"。
 
-#### H3: 小模型容量限制 → 指令-视觉竞争
-<1B 模型的容量有限，在"感知-理解-回答"的联合任务中，高分辨率带来更大视觉处理负担，模型"资源"被感知占用，格式控制（较弱的指令信号）被牺牲。
-**初步支持**：500M（更大）在 640 下语义更稳（100%）而格式更差（0%），暗示容量分配权衡。
+#### H3: 小模型容量限制 → 感知-指令竞争
+<1B 模型容量有限，高分辨率带来更大视觉处理负担，模型"资源"被感知占用，格式控制（较弱的指令信号）被牺牲。
+**支持证据**：a) 500M（更大）语义更稳但格式崩塌更彻底（0% vs 256M 的 36%）——容量大 → 感知充分 → 描述欲望更强；b) 500M 低分辨率下语义摇摆（感知不稳定）与高分辨率下格式崩塌（描述先验过强）是同一容量竞争的两面。
+**待验证**：实验7 温度扫描、更大模型（当前无板端替代模型）。
 
-#### H4（备选）: 视觉编码对位置/尺寸感知增强 → "中心" vs "前景" 判断冲突
-640×480 下模型判断风扇"在 foreground 而非 center"（#4 组 10/10 都这么说）→ 可能模型在尝试"纠正"问题的假设，从而输出更复杂的回答。语义存疑轮（256M #7 "corner"）支持该方向。
+#### H4（备选）: 位置/尺寸感知增强 → "中心" vs "前景" 判断冲突
+640×480 下 500M 判断风扇"在 foreground 而非 center"（初版 #4 组 10/10 如此）→ 模型可能试图"纠正"问题的位置假设，从而输出更复杂的回答。
+**部分支持**：500M 输出中大量 "foreground"/"on a table" 位置表述；但 256M 漂移形态是回答式句子（"There is..."）且语义 100% yes（接受"center"假设），与 H4 的冲突叙事不完全一致 → 降级为辅助假设。
 
-### 6.3 假说的判别方法（摘要）
+### 6.3 假说的判别方法
 
-| 假设 | 判别实验 | 预期 |
-|------|---------|------|
-| H1 | 同分辨率下改变 patch 尺寸/token 数（如缩放 640×480→320×240 等效 token 但保留细节） | token 数下降 → 遵循恢复 |
-| H2 | 模糊/降噪高分辨率图（消除细节但保持分辨率） | 细节消失 → 遵循恢复 |
-| H3 | 更大模型（1.7B+）同实验 | 容量↑ → 遵循改善 |
-| H4 | 换"中性"问题（不含 center 位置假设） | 遵循恢复 |
+| 假设 | 判别实验 | 预期 | 状态 |
+|------|---------|------|------|
+| H1 | token 数测量/耗时 | token 数下降 → 遵循恢复 | **已证伪**（fixed_size 下 token 恒定，见 §4.6） |
+| H2 | 模糊/降噪高分辨率图（消除细节但保持分辨率） | 细节消失 → 遵循恢复 | **待跑**（实验2/3 GStreamer 滤镜，补丁就绪） |
+| H3 | 更大模型（1.7B+）同实验 | 容量↑ → 遵循改善 | 无板端替代模型（离线） |
+| H4 | 换"中性"问题（不含 center 位置假设） | 遵循恢复 | **被证伪**（实验5 B 组去 center 后遵循率反降至 3%，方向与预期相反；§4.4） |
+| — | 措辞框架（探测式 vs 位置断言式） | "Does the image contain...?" 恢复 | **显著恢复**（实验5 D 组 82%, p<0.01；§4.4）——新干预面，机制待研究 |
+| — | 温度扫描 | — | **待跑**（实验7 --temp 补丁就绪） |
 
 （完整实验设计见 `methods.md`）
 
@@ -264,12 +340,15 @@ export LD_LIBRARY_PATH=/userdata/llama/bin
 
 ## 7. 结论 (Conclusion)
 
-本文报告了小规模视觉语言模型在输入分辨率提升时输出格式遵循能力崩塌的实证现象：SmolVLM-256M/500M 在 640×480 分辨率下对 "answer only yes or no" 约束的遵循率从 90–100% 降至 0–10%，语义判断保持正确，且强化 prompt 无效。该现象表明：
-1. **小 VLM 的格式遵循对输入分辨率高度敏感**
-2. **失效发生在输出格式控制层，非感知/推理层**
-3. **prompt 工程无法作为修复手段**，需从解码约束（constrained decoding）或模型/表征层面解决
+本文报告了小规模视觉语言模型在输入分辨率提升时输出格式遵循能力崩塌的实证现象。基于板端实时相机链路的大样本复现（4 组 × ≥27 轮）与分辨率梯度实验（12 组）确认：
 
-对边缘部署的实际启示：若应用要求严格格式输出，低分辨率（320×240）当前是更可靠的选择；高分辨率部署必须配套解码约束或语义解析兜底。
+1. **小 VLM 的格式遵循对输入分辨率高度敏感且存在突变阈值**：256M 在 480×360 仍 100% 合规、640×480 骤降至 36%、800×600 归零；500M 崩塌更早更彻底（480×360 部分漂移、640×480 归零）
+2. **失效发生在输出格式控制层，非感知/推理层**：崩塌分辨率下语义判断 100% 正确；500M 甚至随分辨率提升语义判断单调改善（160 全 No. → 640+ 稳定）
+3. **prompt 工程干预面有限但存在**：强化措辞与多数措辞变体无效甚至更差；唯一显著恢复的干预是探测式句式 "Does the image contain...?"（45%→82%, p<0.01）——提示问题框架本身参与格式遵循，但恢复不彻底（82% 未达基线 320×240 的 100%），解码约束（constrained decoding）或模型/表征层面干预仍是完整解
+4. **机制上排除 token 数量解释**：llama.cpp 7af4279 的 fixed_size 预处理下视觉 token 数恒定、耗时恒定；证据指向视觉细节驱动的描述先验激活（H2）与小模型容量竞争（H3）
+5. **实验方法警示**：静态图测试不复现该现象，板端实时链路实验不可替代
+
+对边缘部署的实际启示：若应用要求严格格式输出，低分辨率（320×240）当前是更可靠的选择；但需注意 500M@320 存在语义摇摆风险（41%），并评估感知能力余量（256M@160/320 感知稳定、500M@320 感知不稳）。高分辨率部署必须配套解码约束或语义解析兜底。
 
 ---
 
@@ -277,60 +356,65 @@ export LD_LIBRARY_PATH=/userdata/llama/bin
 
 - **单场景**: 仅测试工业风扇 yes/no 单一任务；需多场景、多类别验证普适性
 - **单任务类型**: 仅二元判断；需测试多选、JSON 等更复杂格式约束
-- **模型家族局限**: 仅 SmolVLM 家族；需扩展至 Qwen2-VL、LLaVA、Moondream 等
+- **模型家族局限**: 仅 SmolVLM 家族；跨模型方案（Qwen2-VL/Moondream，原实验4）因**板端无外网**无法实施，已删除——结论的模型普适性仍待验证
 - **量化影响**: Q8_0 量化是否放大格式遵循退化未验证（需对比 F16）
-- **温度**: 固定 0.1；需扫描温度对遵循率的影响
-- **样本量**: 每组 10 轮偏少；需扩大至 ≥30 轮以做统计显著性检验
-- **未来方向**: 解码约束（logit 掩码强制 yes/no）、LoRA 指令对齐、分辨率自适应视觉 token 压缩
+- **温度**: 固定 0.1；实验7 温度扫描（--temp 补丁已就绪）待跑
+- **图像处理变体**: 实验2/3（GStreamer 模糊/缩放/裁剪，补丁已就绪）待跑——直接检验 H2
+- **样本量**: 复现组与梯度组已扩至 ≥27 轮/组；措辞变体组完成后可做统计显著性检验（χ²/Fisher）
+- **未来方向**: 解码约束（logit 掩码强制 yes/no）、LoRA 指令对齐、分辨率自适应视觉 token 压缩、CPU 端注意力可视化验证 H2
 
 ---
 
 ## 附录 A. 原始数据（摘录）
 
-### A.1 256M @ 640×480 普通 prompt（前 10 轮）
+### A.1 256M @ 640×480 复现组（44 轮，前 10 轮）
 
 | # | 耗时 | 原始输出 |
 |---|------|---------|
-| 1 | 6.10s | "There is a black industrial fan in the center of the image." |
-| 2 | 5.73s | "There is a black industrial fan in the center of the image." |
-| 3 | 5.70s | "There is a black industrial fan in the center of the image." |
-| 4 | 5.47s | "Yes." |
-| 5 | 5.67s | "There is a black industrial fan in the center of the image." |
-| 6 | 5.64s | "There is a black industrial fan in the center of the image." |
-| 7 | 5.72s | "There is a black industrial fan in the corner of the image." |
-| 8 | 5.61s | "There is a black industrial fan in the center of the image." |
-| 9 | 5.64s | "There is a black industrial fan in the center of the image." |
-| 10 | 5.63s | "There is a black industrial fan in the center of the image." |
+| 1 | ~5.6s | "There is a black industrial fan in the center of the image." |
+| 2 | ~5.6s | "There is a black industrial fan in the center of the image." |
+| 3 | ~5.6s | "Yes." |
+| 4 | ~5.6s | "There is a black industrial fan in the center of the image." |
+| 5 | ~5.6s | "Yes." |
+| 6 | ~5.6s | "There is a black industrial fan in the center of the image." |
+| 7 | ~5.6s | "There is a black industrial fan in the corner of the image." |
+| 8 | ~5.6s | "There is a black industrial fan in the center of the image." |
+| 9 | ~5.6s | "There is a black industrial fan in the center of the image." |
+| 10 | ~5.6s | "Yes." |
 
-### A.2 500M @ 640×480 普通 prompt（前 10 轮）
+（完整 44 轮见 `data/exp_256_640.log`；严格遵循 16/44=36%）
+
+### A.2 500M @ 640×480 复现组（36 轮，前 8 轮）
 
 | # | 耗时 | 原始输出 |
 |---|------|---------|
-| 1 | 7.88s | "A black industrial fan is in the foreground of the image." |
-| 2 | 6.61s | "A black industrial fan is in the foreground of the image." |
-| 3 | 6.56s | "A black industrial fan is in the foreground of the image." |
-| 4 | 6.70s | "A black industrial fan is in the foreground of the image." |
-| 5 | 6.70s | "A black industrial fan sits on a table in a factory warehouse." |
-| 6 | 6.69s | "A black industrial fan sits on a table in a factory warehouse." |
-| 7 | 6.74s | "A black industrial fan is on a table in the foreground of the image." |
-| 8 | 6.70s | "A black industrial fan is on a table in the foreground of the image." |
-| 9 | 6.69s | "A black industrial fan is on a table in the foreground of the image." |
-| 10 | 6.60s | "A black industrial fan is in the foreground of the image." |
+| 1 | ~6.7s | "A factory warehouse scene with a black industrial fan in the center." |
+| 2 | ~6.7s | "A black industrial fan is in the foreground of the image." |
+| 3 | ~6.7s | "A factory warehouse scene with a black industrial fan in the center." |
+| 4 | ~6.7s | "A black industrial fan is in the foreground of the image." |
+| 5 | ~6.7s | "A black industrial fan sits on a table in a factory warehouse." |
+| 6 | ~6.7s | "A factory warehouse scene with a black industrial fan in the center." |
+| 7 | ~6.7s | "A black industrial fan is on a table in the foreground of the image." |
+| 8 | ~6.7s | "A black industrial fan is in the foreground of the image." |
 
-### A.3 500M @ 320×240（前 10 轮，含唯一误判）
+（完整 36 轮见 `data/exp_500_640.log`；格式遵循 0/36，语义 36/36 yes）
 
-| # | 耗时 | 判定 |
-|---|------|------|
-| 1 | 7.40s | YES |
-| 2 | 6.16s | YES |
-| 3 | 6.22s | YES |
-| 4 | 6.20s | YES |
-| 5 | 6.20s | **NO（误判）** |
-| 6 | 6.21s | YES |
-| 7 | 6.16s | YES |
-| 8 | 6.20s | YES |
-| 9 | 6.14s | YES |
-| 10 | 6.17s | YES |
+### A.3 500M @ 320×240（39 轮，语义摇摆：16 yes / 23 no）
+
+| # | 耗时 | 原始输出 | 判定 |
+|---|------|---------|------|
+| 1 | ~6.2s | "Yes." | YES |
+| 2 | ~6.2s | "Yes." | YES |
+| 3 | ~6.2s | "No." | NO |
+| 4 | ~6.2s | "No." | NO |
+| 5 | ~6.2s | "No." | NO |
+| 6 | ~6.2s | "Yes." | YES |
+| 7 | ~6.2s | "No." | NO |
+| 8 | ~6.2s | "No." | NO |
+| 9 | ~6.2s | "Yes." | YES |
+| 10 | ~6.2s | "No." | NO |
+
+（完整 39 轮见 `data/exp_500_320.log`；格式 39/39 合规，语义 yes 16/39=41%）
 
 ---
 
@@ -340,7 +424,7 @@ export LD_LIBRARY_PATH=/userdata/llama/bin
 - Wei, J., et al. (2021). Finetuned language models are zero-shot learners. ICLR.
 - Zhou, C., et al. (2024). LIMA: Less is more for alignment. NeurIPS.
 - SmolVLM: HuggingFace SmolVLM-Instruct technical report.
-- llama.cpp: GitHub repository (v0.15.3).
+- llama.cpp: GitHub repository（板端实测 commit 7af4279，报告其 soname 为 v0.15.3 系）。
 - RK3588: Rockchip technical reference manual.
 
 *（注：以上为占位引用，投稿前需补充完整文献调研——见 methods.md 第 6 节）*
@@ -351,9 +435,15 @@ export LD_LIBRARY_PATH=/userdata/llama/bin
 
 | 材料 | 位置 |
 |------|------|
-| 实验文档 ×6 | `rk3588-vlm/experiment/experiment-smolvlm*.md` |
-| 综合报告 | `rk3588-vlm/experiment/report.md` |
-| 板端原始日志 ×6 | 板端 `/tmp/main_vlm*.log` |
+| 大样本日志 ×4（复现组） | `experiment/data/exp_{256,500}_{320,640}.log` |
+| 梯度日志 ×12（实验1） | `experiment/data/exp1_*.log` + 帧采样 `.tgz` |
+| 措辞变体日志 ×7（实验5） | `experiment/data/exp5_*.log` |
+| 初版实验文档 ×6 | `experiment/experiment-smolvlm*.md`（10 轮小样本，严厉 prompt 数据） |
+| 综合报告 | `experiment/report.md`、`experiment/data/PROGRESS.md` |
+| 统计脚本 | `experiment/analyze.py`、`experiment/frame_analysis.py` |
+| 驱动脚本 | `experiment/run_exp1.py`、`experiment/run_exp5.py`、`experiment/board_exp_run.sh` |
+| 板端原始日志 | 板端 `/tmp/*.log`（每组实验后已拉回本地） |
 | 测试程序源码 | `rk3588-vlm/{main,camera,llama_server,result_parser}.c` |
 | 判定单元测试 | `rk3588-vlm/test_parser.c` (20 cases) |
-| 测试图 | `rk3588-vlm/rk3588_640x480.jpg` |
+| 测试图 | `rk3588-vlm/rk3588_640x480.jpg`、`rk3588_capture_320x240.jpg` |
+| 实验7/2/3 补丁 | `experiment/patches/exp7_temp_exp23_gstextra.patch` + README |

@@ -1,0 +1,31 @@
+[1/7] exp5_A_256_640_ctrl ...
+  exit=0 (193s) rk3588-vlm exit: 124, log: /tmp/exp5_A_256_640_ctrl.log, lines: 288, frames: 89
+  pulled exp5_A_256_640_ctrl.log
+  pulled exp5_A_256_640_ctrl.tgz -rw-r--r-- 1 linaro linaro 4617756  5月 23 22:10 exp5_A_256_640_ctrl.tgz
+[2/7] exp5_B_256_640 ...
+  exit=0 (196s) rk3588-vlm exit: 124, log: /tmp/exp5_B_256_640.log, lines: 297, frames: 0
+  pulled exp5_B_256_640.log
+[3/7] exp5_C_256_640 ...
+  exit=0 (193s) rk3588-vlm exit: 124, log: /tmp/exp5_C_256_640.log, lines: 297, frames: 0
+  pulled exp5_C_256_640.log
+[4/7] exp5_D_256_640 ...
+  exit=0 (193s) rk3588-vlm exit: 124, log: /tmp/exp5_D_256_640.log, lines: 297, frames: 0
+  pulled exp5_D_256_640.log
+[5/7] exp5_E_256_640 ...
+  exit=0 (191s) rk3588-vlm exit: 124, log: /tmp/exp5_E_256_640.log, lines: 289, frames: 0
+  pulled exp5_E_256_640.log
+[6/7] exp5_F_256_640 ...
+  exit=0 (192s) rk3588-vlm exit: 124, log: /tmp/exp5_F_256_640.log, lines: 289, frames: 0
+  pulled exp5_F_256_640.log
+[7/7] exp5_G_500_320 ...
+  exit=0 (254s) rk3588-vlm exit: 124, log: /tmp/exp5_G_500_320.log, lines: 345, frames: 0
+  pulled exp5_G_500_320.log
+
+=== 汇总 ===
+('exp5_A_256_640_ctrl', 'ok', 0, 192.57971501350403)
+('exp5_B_256_640', 'ok', 0, 195.6409878730774)
+('exp5_C_256_640', 'ok', 0, 193.44929265975952)
+('exp5_D_256_640', 'ok', 0, 192.57257461547852)
+('exp5_E_256_640', 'ok', 0, 191.3299241065979)
+('exp5_F_256_640', 'ok', 0, 191.56795930862427)
+('exp5_G_500_320', 'ok', 0, 254.0823884010315)
