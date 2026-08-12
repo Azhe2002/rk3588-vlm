@@ -34,9 +34,14 @@ GROUPS = [
     ('exp2_D_crop320', 640, 480, 'videocrop left=160 right=160 top=120 bottom=120'),
     # 实验3: 模糊/去纹理 (H2)
     # 注: 板端 gaussianblur 拒收 NV12 且输出 jpegenc 不认, 需两端 videoconvert (实测验证)
+    # σ 精细扫描: 1/2 轻糊(应保留语义), 4/5 过渡带(语义可能开始掉)
     ('exp3_B1_blur3', 640, 480, 'videoconvert ! gaussianblur sigma=3 ! videoconvert'),
     ('exp3_B2_blur7', 640, 480, 'videoconvert ! gaussianblur sigma=7 ! videoconvert'),
     ('exp3_B3_blur15', 640, 480, 'videoconvert ! gaussianblur sigma=15 ! videoconvert'),
+    ('exp3_B4_blur1', 640, 480, 'videoconvert ! gaussianblur sigma=1 ! videoconvert'),
+    ('exp3_B5_blur2', 640, 480, 'videoconvert ! gaussianblur sigma=2 ! videoconvert'),
+    ('exp3_B6_blur4', 640, 480, 'videoconvert ! gaussianblur sigma=4 ! videoconvert'),
+    ('exp3_B7_blur5', 640, 480, 'videoconvert ! gaussianblur sigma=5 ! videoconvert'),
     ('exp3_C_tex160', 640, 480, 'videoscale ! video/x-raw,width=160,height=120 ! videoscale ! video/x-raw,width=640,height=480'),
 ]
 
@@ -44,14 +49,14 @@ def main():
     dry = '--dry' in sys.argv
     only = None
     if '--only' in sys.argv:
-        only = sys.argv[sys.argv.index('--only') + 1]
+        only = sys.argv[sys.argv.index('--only') + 1].split(',')
     c = get_client()
     run(c, 'pkill -f rk3588-vlm; pkill -f llama-server', timeout=30)
     sftp_put(c, RUNSH, '/tmp/board_exp_run.sh')
     run(c, 'chmod +x /tmp/board_exp_run.sh', timeout=30)
     results = []
     for i, (tag, w, h, gst) in enumerate(GROUPS, 1):
-        if only and only not in tag:
+        if only and not any(o in tag for o in only):
             print(f"[{i}/{len(GROUPS)}] {tag} ... skipped (--only {only})", flush=True)
             continue
         log = f"/tmp/{tag}.log"
