@@ -1,15 +1,27 @@
-# 实验7 / 实验2/3 代码补丁说明 (2026-08-11)
+# 实验7 / 实验2/3 代码补丁说明 (2026-08-11, **2026-08-12 已应用**)
 
 > 本补丁**只改实验所需的最小范围**，不改变既有行为（默认值与原来完全一致）。
-> 由用户自行编译、推板后执行对应的实验组。
+> **2026-08-12: 补丁已 git apply 到工作区源码（当前代码即 v0.2，含 --temp/--gst-extra）。**
+> 由用户自行编译（`bash build-arm64-docker.sh`）、推板到 `/userdata/llama/bin/rk3588-vlm` 后执行对应的实验组。
 
-## 应用方式
+## 应用方式（已应用，无需重复执行）
 
 ```bash
-# 在工作区根目录 (rk3588-vlm/) 执行:
+# 已在工作区根目录 (rk3588-vlm/) 执行:
 git apply experiment/patches/exp7_temp_exp23_gstextra.patch
-# 编译 (沿用 build-arm64-docker.sh) → 推送 /userdata/llama/bin/rk3588-vlm → 跑实验
+# 当前代码即新版本; 直接编译即可
+# 编译 (build-arm64-docker.sh) → 推送 /userdata/llama/bin/rk3588-vlm → 跑实验
 ```
+
+## 配套脚本（2026-08-12 新增）
+
+| 文件 | 作用 |
+|------|------|
+| `experiment/board_exp_run.sh` | 已支持第 9/10 参数 `[temp] [gst_extra]`（bash 数组传参，元素串可含空格） |
+| `experiment/run_exp7.py` | 温度扫描驱动（256M@640, temp∈{0.0,0.1,0.5,1.0}；`--500` 追加 500M 组）；自动推送新版 board_exp_run.sh 到板端 |
+| `experiment/run_exp2_3.py` | 滤镜变体驱动（实验2 B/C/D + 实验3 B1/B2/B3/C，逐组帧采样）；自动推送新版 board_exp_run.sh |
+
+> 注意: 板端旧版 rk3588-vlm 二进制无 --temp/--gst-extra，新脚本传参会报"未知参数"退出——**必须先推板 v0.2 二进制**。
 
 ## 改动内容
 

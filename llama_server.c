@@ -49,6 +49,7 @@ struct llama_handle {
     char    base_url[128];
     pid_t   server_pid;
     int     initialized;
+    float   temperature;  /* 请求体采样温度 (实验7: --temp 可调, 默认 0.1) */
 };
 
 // ---------------- 内存缓冲 (用于 libcurl 写回调) ----------------
@@ -238,11 +239,18 @@ static int wait_for_server_ready(const char* base_url, int timeout_sec) {
     return ok ? 0 : -1;
 }
 
-llama_handle_t llama_init(const char* model_path, const char* mmproj_path) {
+llama_handle_t llama_init(const char* model_path, const char* mmproj_path, float temperature) {
     ensure_curl_global();
 
     struct llama_handle* h = calloc(1, sizeof(struct llama_handle));
     if (!h) return NULL;
+
+    if (temperature < 0.0f || temperature > 2.0f) {
+        fprintf(stderr, "[llama] 温度参数非法: %.2f (允许 0.0~2.0)\n", temperature);
+        free(h);
+        return NULL;
+    }
+    h->temperature = temperature;
 
     strncpy(h->model_path,  model_path,  sizeof(h->model_path) - 1);
     strncpy(h->mmproj_path, mmproj_path, sizeof(h->mmproj_path) - 1);
@@ -384,6 +392,7 @@ char* llama_infer(llama_handle_t handle,
     }
 
     // OpenAI 兼容格式: image_url 用 data URI 内嵌 base64
+    // temperature 由 llama_init 传入 (默认 0.1, 实验7 通过 --temp 扫描)
     snprintf(body, body_cap,
         "{"
           "\"messages\":["
@@ -393,10 +402,10 @@ char* llama_infer(llama_handle_t handle,
               "{\"type\":\"image_url\",\"image_url\":{\"url\":\"data:image/jpeg;base64,%s\"}}"
             "]}"
           "],"
-          "\"temperature\":0.1,"
+          "\"temperature\":%.2f,"
           "\"max_tokens\":16"
         "}",
-        sys_esc, usr_esc, b64);
+        sys_esc, usr_esc, b64, h->temperature);
 
     free(b64);
     free(sys_esc);

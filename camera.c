@@ -25,6 +25,7 @@ static pthread_t g_thread;
 static bool g_thread_started = false;
 static atomic_bool g_running = ATOMIC_VAR_INIT(false);
 static char g_device[256];
+static char g_fx_extra[512];  /* 附加 GStreamer 元素 (实验2/3 变体图), 默认空 */
 static int g_width = 1920;
 static int g_height = 1080;
 static pthread_mutex_t g_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -95,13 +96,25 @@ static pid_t start_gstreamer(int* read_fd) {
 
     if (pid == 0) {
         char device_arg[sizeof(g_device) + 16];
-        char caps[160];
-        char fps_caps[64];
+        char pipeline[768];
         (void)snprintf(device_arg, sizeof(device_arg), "device=%s", g_device);
-        (void)snprintf(caps, sizeof(caps),
-                       "video/x-raw,format=NV12,width=%d,height=%d", g_width, g_height);
-        (void)snprintf(fps_caps, sizeof(fps_caps),
-                       "video/x-raw,framerate=%d/1", CAMERA_FPS);
+
+        // 整条管道拼成单个字符串传给 gst-launch-1.0。
+        // g_fx_extra 插入 jpegenc 之前 (元素串内勿含空格; 需要带空格/引号的
+        // caps 请用单引号包裹，如 videoscale ! video/x-raw,width=320,height=240)。
+        int n = snprintf(pipeline, sizeof(pipeline),
+            "v4l2src %s ! video/x-raw,format=NV12,width=%d,height=%d"
+            " ! videorate drop-only=true ! video/x-raw,framerate=%d/1"
+            "%s%s"
+            " ! jpegenc ! fdsink fd=1 sync=false",
+            device_arg, g_width, g_height, CAMERA_FPS,
+            g_fx_extra[0] ? " ! " : "", g_fx_extra);
+
+        if (n < 0 || (size_t)n >= sizeof(pipeline)) {
+            static const char message[] = "[camera] GStreamer 管道串过长\n";
+            (void)write(STDERR_FILENO, message, sizeof(message) - 1U);
+            _exit(128);
+        }
 
         close(pipefd[0]);
         if (dup2(pipefd[1], STDOUT_FILENO) < 0) {
@@ -109,14 +122,7 @@ static pid_t start_gstreamer(int* read_fd) {
         }
         close(pipefd[1]);
 
-        execlp("gst-launch-1.0", "gst-launch-1.0", "-q",
-               "v4l2src", device_arg,
-               "!", caps,
-               "!", "videorate", "drop-only=true",
-               "!", fps_caps,
-               "!", "jpegenc",
-               "!", "fdsink", "fd=1", "sync=false",
-               (char*)NULL);
+        execlp("gst-launch-1.0", "gst-launch-1.0", "-q", pipeline, (char*)NULL);
 
         static const char message[] = "[camera] 无法执行 gst-launch-1.0\n";
         (void)write(STDERR_FILENO, message, sizeof(message) - 1U);
@@ -284,13 +290,17 @@ static int write_frame_to_path(const unsigned char* data, size_t length,
     return result;
 }
 
-int camera_start(const char* device, int width, int height) {
+int camera_start(const char* device, int width, int height, const char* gst_extra) {
     if (!device || device[0] == '\0' || width <= 0 || height <= 0) {
         fprintf(stderr, "[camera] 无效的设备或分辨率参数\n");
         return -1;
     }
     if (strlen(device) >= sizeof(g_device)) {
         fprintf(stderr, "[camera] 设备路径过长\n");
+        return -1;
+    }
+    if (gst_extra && strlen(gst_extra) >= sizeof(g_fx_extra)) {
+        fprintf(stderr, "[camera] --gst-extra 过长\n");
         return -1;
     }
 
@@ -301,6 +311,8 @@ int camera_start(const char* device, int width, int height) {
     }
 
     (void)snprintf(g_device, sizeof(g_device), "%s", device);
+    if (gst_extra) (void)snprintf(g_fx_extra, sizeof(g_fx_extra), "%s", gst_extra);
+    else g_fx_extra[0] = '\0';
     g_width = width;
     g_height = height;
     g_frame_ready = false;

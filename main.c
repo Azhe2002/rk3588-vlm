@@ -86,6 +86,24 @@ static bool parse_int(const char* text, int min, int max,
     return true;
 }
 
+static bool parse_float(const char* text, float min, float max,
+                        float* out, const char* name) {
+    if (!text || text[0] == '\0') {
+        fprintf(stderr, "参数 %s 缺少数值\n", name);
+        return false;
+    }
+    errno = 0;
+    char* end = NULL;
+    float val = strtof(text, &end);
+    if (errno == ERANGE || end == text || *end != '\0'
+            || val < min || val > max) {
+        fprintf(stderr, "参数 %s 必须是 %.2f~%.2f 的数值: %s\n", name, min, max, text);
+        return false;
+    }
+    *out = val;
+    return true;
+}
+
 static int64_t monotonic_ms(void) {
     struct timespec now;
     if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) return -1;
@@ -113,10 +131,12 @@ typedef struct {
     char object[256];
     char scene[256];
     char question[256];
+    char gst_extra[512]; /* 附加 GStreamer 元素 (实验2/3 变体图: 模糊/缩放/裁剪), 默认空 */
     int  width;
     int  height;
     int  interval;
     int  strict;   /* 1=严格 yes/no 判定(默认)  0=宽泛语义判定 */
+    float temp;    /* 采样温度 (实验7 温度扫描), 默认 0.1 */
 } config_t;
 
 static void print_usage(const char* prog) {
@@ -132,6 +152,8 @@ static void print_usage(const char* prog) {
     printf("  --height   N      采集高度 (默认: %d, 最大: %d)\n", DEFAULT_HEIGHT, MAX_HEIGHT);
     printf("  --interval N      推理间隔秒数 (默认: %d, 最大: %d)\n", DEFAULT_INTERVAL, MAX_INTERVAL);
     printf("  --strict   N      判定模式: 1=严格yes/no(默认) 0=宽泛语义判定\n");
+    printf("  --temp     F      采样温度 0.0~2.0 (默认: 0.1)\n");
+    printf("  --gst-extra STR   附加 GStreamer 元素串 (实验用: 模糊/缩放/裁剪, 默认空)\n");
     printf("  --help            显示帮助\n");
 }
 
@@ -143,10 +165,12 @@ static int parse_args(int argc, char** argv, config_t* cfg) {
     copy_option(cfg->object,   sizeof(cfg->object),   DEFAULT_OBJECT,   "--object");
     copy_option(cfg->scene,    sizeof(cfg->scene),    DEFAULT_SCENE,    "--scene");
     copy_option(cfg->question, sizeof(cfg->question), DEFAULT_QUESTION, "--question");
+    cfg->gst_extra[0] = '\0';
     cfg->width    = DEFAULT_WIDTH;
     cfg->height   = DEFAULT_HEIGHT;
     cfg->interval = DEFAULT_INTERVAL;
     cfg->strict   = 1;   /* 默认严格模式，保持既有行为 */
+    cfg->temp     = 0.1f; /* 与原有硬编码请求温度一致 */
 
     for (int i = 1; i < argc; i++) {
         const char* opt = argv[i];
@@ -171,6 +195,8 @@ static int parse_args(int argc, char** argv, config_t* cfg) {
         else if (strcmp(opt, "--height")   == 0) ok = parse_int(val, 1, MAX_HEIGHT, &cfg->height,   opt);
         else if (strcmp(opt, "--interval") == 0) ok = parse_int(val, 1, MAX_INTERVAL,   &cfg->interval, opt);
         else if (strcmp(opt, "--strict")   == 0) ok = parse_int(val, 0, 1,             &cfg->strict,   opt);
+        else if (strcmp(opt, "--temp")     == 0) ok = parse_float(val, 0.0f, 2.0f,     &cfg->temp,     opt);
+        else if (strcmp(opt, "--gst-extra") == 0) ok = copy_option(cfg->gst_extra, sizeof(cfg->gst_extra), val, opt);
         else {
             fprintf(stderr, "未知参数: %s\n", opt);
             print_usage(argv[0]);
@@ -216,13 +242,16 @@ int main(int argc, char** argv) {
     printf("  分辨率: %dx%d\n", cfg.width, cfg.height);
     printf("  间隔:   %ds\n", cfg.interval);
     printf("  判定:   %s\n", cfg.strict ? "严格 yes/no" : "宽泛语义判定");
+    printf("  温度:   %.2f\n", cfg.temp);
+    if (cfg.gst_extra[0] != '\0')
+        printf("  GStreamer 附加: %s\n", cfg.gst_extra);
     printf("=========================================\n\n");
     printf("[main] 系统提示词:\n  %s\n\n", system_prompt);
     printf("[main] 用户提示词:\n  %s\n\n", cfg.question);
 
     // 1. 启动常驻 llama-server (模型只加载一次)
     printf("[main] 启动推理服务...\n");
-    llama_handle_t llama = llama_init(cfg.model, cfg.mmproj);
+    llama_handle_t llama = llama_init(cfg.model, cfg.mmproj, cfg.temp);
     if (!llama) {
         fprintf(stderr, "[main] 推理服务启动失败，退出\n");
         return 1;
@@ -230,7 +259,7 @@ int main(int argc, char** argv) {
 
     // 2. 启动持久相机管道
     printf("[main] 启动相机...\n");
-    if (camera_start(cfg.camera, cfg.width, cfg.height) != 0) {
+    if (camera_start(cfg.camera, cfg.width, cfg.height, cfg.gst_extra) != 0) {
         fprintf(stderr, "[main] 相机启动失败，退出\n");
         llama_free(llama);
         return 1;
@@ -252,7 +281,7 @@ int main(int argc, char** argv) {
             fprintf(stderr, "  📷 取帧失败，正在重启采集管道\n");
             camera_stop();
             if (g_keep_running
-                    && camera_start(cfg.camera, cfg.width, cfg.height) == 0) {
+                    && camera_start(cfg.camera, cfg.width, cfg.height, cfg.gst_extra) == 0) {
                 printf("  📷 采集管道已恢复\n");
             } else if (g_keep_running) {
                 fprintf(stderr, "  📷 重启失败，下轮重试\n");

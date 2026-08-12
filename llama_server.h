@@ -11,8 +11,9 @@ typedef void* llama_handle_t;
 // 初始化 + 启动常驻 server（程序启动时调用一次，耗时 ~2-10s）
 // model_path : .gguf 模型文件路径
 // mmproj_path: mmproj 文件路径
+// temperature: 采样温度 (0.0-2.0, 实验7 温度扫描用; 原固定值 0.1)
 // 返回: 句柄 (NULL 表示失败)
-llama_handle_t llama_init(const char* model_path, const char* mmproj_path);
+llama_handle_t llama_init(const char* model_path, const char* mmproj_path, float temperature);
 
 // 推理：图像 + 系统提示词 + 用户提示词 → 原始输出 (HTTP 请求)
 // handle      : llama_init 返回的句柄
