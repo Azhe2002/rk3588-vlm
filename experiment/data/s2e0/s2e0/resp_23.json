@@ -1,0 +1,8 @@
+{
+ "idx": 23,
+ "cond": "response_format",
+ "http_status": 200,
+ "latency_s": 0.41,
+ "error": null,
+ "response": "{\"choices\":[{\"finish_reason\":\"length\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"{\\n    \\\"answer\\\": \\\"yes\\\"\\n}\"}}],\"created\":1779660003,\"model\":\"/userdata/llama/models/SmolVLM-256M-Instruct-Q8_0.gguf\",\"system_fingerprint\":\"b1-7af4279\",\"object\":\"chat.completion\",\"usage\":{\"completion_tokens\":16,\"prompt_tokens\":148,\"total_tokens\":164,\"prompt_tokens_details\":{\"cached_tokens\":147}},\"id\":\"chatcmpl-EcwMQfesZBZadbaOtrXylAB9bMMeYIQU\",\"timings\":{\"cache_n\":147,\"prompt_n\":1,\"prompt_ms\":59.384,\"prompt_per_token_ms\":59.384,\"prompt_per_second\":16.839552741479185,\"predicted_n\":16,\"predicted_ms\":307.696,\"predicted_per_token_ms\":19.231,\"predicted_per_second\":51.9993760074879}}"
+}

@@ -1,0 +1,8 @@
+{
+ "idx": 10,
+ "cond": "grammar",
+ "http_status": 200,
+ "latency_s": 0.12,
+ "error": null,
+ "response": "{\"choices\":[{\"finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"Yes.\"}}],\"created\":1779659983,\"model\":\"/userdata/llama/models/SmolVLM-256M-Instruct-Q8_0.gguf\",\"system_fingerprint\":\"b1-7af4279\",\"object\":\"chat.completion\",\"usage\":{\"completion_tokens\":3,\"prompt_tokens\":148,\"total_tokens\":151,\"prompt_tokens_details\":{\"cached_tokens\":147}},\"id\":\"chatcmpl-XnEqxkD9ll0nrMQcqMvaXdWuPRTfobVy\",\"timings\":{\"cache_n\":147,\"prompt_n\":1,\"prompt_ms\":36.725,\"prompt_per_token_ms\":36.725,\"prompt_per_second\":27.22940776038121,\"predicted_n\":3,\"predicted_ms\":57.656,\"predicted_per_token_ms\":19.218666666666667,\"predicted_per_second\":52.032745941445825}}"
+}

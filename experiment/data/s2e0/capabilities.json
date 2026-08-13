@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "probe_date_local": "2026-08-13",
+  "server_version": "version: 1 (7af4279), built with GNU 10.2.1 for Linux aarch64",
+  "model_probed": "SmolVLM-256M-Instruct-Q8_0 + mmproj-SmolVLM-256M-Instruct-Q8_0",
+  "endpoint": "/v1/chat/completions",
+  "probe_design": "2 images (pos real 640x480 / neg solid gray) x 6 conditions x 2 reps = 24 requests, content order text->image, max_tokens=16",
+  "capabilities": {
+    "seed": {
+      "status": "supported",
+      "evidence": "temp=0.5 seed=17001 twice -> byte-identical outputs (15-token sentence identical twice; chance < 1e-6)",
+      "caveats": "verified at temp=0.5 only"
+    },
+    "cache_prompt": {
+      "status": "supported",
+      "evidence": "cache_prompt=false -> cached_tokens=0 in usage, both reps ~6.2s (vs 0.1-0.3s cached); default (absent) -> cached_tokens=147, rep2 0.3s",
+      "caveats": "field name cache_prompt accepted on chat endpoint"
+    },
+    "n_probs": {
+      "status": "supported",
+      "evidence": "n_probs=5 -> choices[0].logprobs.content[] with top_logprobs (5 candidates per token, id/token/bytes/logprob)",
+      "caveats": "chat endpoint returns logprobs in OpenAI-ish format"
+    },
+    "grammar": {
+      "status": "supported",
+      "evidence": "request-level grammar (GBNF yes/no) on chat endpoint -> outputs constrained to \"Yes.\"/\"No.\", finish_reason=stop, no error",
+      "caveats": "grammar string is GBNF; this server version accepts grammar on /v1/chat/completions (verified on board 7af4279)"
+    },
+    "response_format_json_schema": {
+      "status": "supported",
+      "evidence": "{\"type\":\"json_schema\",...} -> output switched to JSON ({\"answer\": \"yes\"}); pos image truncated at max_tokens=16 with finish_reason=length",
+      "caveats": "truncation risk at max_tokens=16; use larger max_tokens or prefer grammar for yes/no"
+    },
+    "usage": {
+      "status": "supported",
+      "evidence": "usage present incl. prompt_tokens_details.cached_tokens (0 when cache off, 147 when hit; partial 78 across-image)"
+    },
+    "timings": {
+      "status": "supported",
+      "evidence": "timings field present in all responses"
+    }
+  },
+  "notes": {
+    "content_order_surprise": "baseline text->image temp=0.0 on STATIC positive image produced descriptive sentence 'A industrial fan is on the corner of a shelf.' (not 'Yes.') - historical 'static images always comply' finding used image->text order; content order ablation (S2-E1) is now high priority",
+    "cache_default": "prompt cache defaults ON; identical-request rep2 ~0.1-0.3s (cached_tokens=147 of 148 prompt tokens)",
+    "truncation": "max_tokens=16 truncates json_schema output (finish_reason=length)"
+  }
+}

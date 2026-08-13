@@ -1,0 +1,218 @@
+[
+ {
+  "idx": 1,
+  "cond": "baseline",
+  "http_status": 200,
+  "latency_s": 6.27,
+  "error": null,
+  "img": "pos",
+  "rep": 1
+ },
+ {
+  "idx": 2,
+  "cond": "baseline",
+  "http_status": 200,
+  "latency_s": 0.3,
+  "error": null,
+  "img": "pos",
+  "rep": 2
+ },
+ {
+  "idx": 3,
+  "cond": "seed",
+  "http_status": 200,
+  "latency_s": 0.35,
+  "error": null,
+  "img": "pos",
+  "rep": 1
+ },
+ {
+  "idx": 4,
+  "cond": "seed",
+  "http_status": 200,
+  "latency_s": 0.34,
+  "error": null,
+  "img": "pos",
+  "rep": 2
+ },
+ {
+  "idx": 5,
+  "cond": "cache_off",
+  "http_status": 200,
+  "latency_s": 6.18,
+  "error": null,
+  "img": "pos",
+  "rep": 1
+ },
+ {
+  "idx": 6,
+  "cond": "cache_off",
+  "http_status": 200,
+  "latency_s": 6.21,
+  "error": null,
+  "img": "pos",
+  "rep": 2
+ },
+ {
+  "idx": 7,
+  "cond": "n_probs",
+  "http_status": 200,
+  "latency_s": 0.31,
+  "error": null,
+  "img": "pos",
+  "rep": 1
+ },
+ {
+  "idx": 8,
+  "cond": "n_probs",
+  "http_status": 200,
+  "latency_s": 0.31,
+  "error": null,
+  "img": "pos",
+  "rep": 2
+ },
+ {
+  "idx": 9,
+  "cond": "grammar",
+  "http_status": 200,
+  "latency_s": 0.1,
+  "error": null,
+  "img": "pos",
+  "rep": 1
+ },
+ {
+  "idx": 10,
+  "cond": "grammar",
+  "http_status": 200,
+  "latency_s": 0.12,
+  "error": null,
+  "img": "pos",
+  "rep": 2
+ },
+ {
+  "idx": 11,
+  "cond": "response_format",
+  "http_status": 200,
+  "latency_s": 0.51,
+  "error": null,
+  "img": "pos",
+  "rep": 1
+ },
+ {
+  "idx": 12,
+  "cond": "response_format",
+  "http_status": 200,
+  "latency_s": 0.52,
+  "error": null,
+  "img": "pos",
+  "rep": 2
+ },
+ {
+  "idx": 13,
+  "cond": "baseline",
+  "http_status": 200,
+  "latency_s": 5.55,
+  "error": null,
+  "img": "neg",
+  "rep": 1
+ },
+ {
+  "idx": 14,
+  "cond": "baseline",
+  "http_status": 200,
+  "latency_s": 0.11,
+  "error": null,
+  "img": "neg",
+  "rep": 2
+ },
+ {
+  "idx": 15,
+  "cond": "seed",
+  "http_status": 200,
+  "latency_s": 0.08,
+  "error": null,
+  "img": "neg",
+  "rep": 1
+ },
+ {
+  "idx": 16,
+  "cond": "seed",
+  "http_status": 200,
+  "latency_s": 0.08,
+  "error": null,
+  "img": "neg",
+  "rep": 2
+ },
+ {
+  "idx": 17,
+  "cond": "cache_off",
+  "http_status": 200,
+  "latency_s": 6.02,
+  "error": null,
+  "img": "neg",
+  "rep": 1
+ },
+ {
+  "idx": 18,
+  "cond": "cache_off",
+  "http_status": 200,
+  "latency_s": 6.01,
+  "error": null,
+  "img": "neg",
+  "rep": 2
+ },
+ {
+  "idx": 19,
+  "cond": "n_probs",
+  "http_status": 200,
+  "latency_s": 0.11,
+  "error": null,
+  "img": "neg",
+  "rep": 1
+ },
+ {
+  "idx": 20,
+  "cond": "n_probs",
+  "http_status": 200,
+  "latency_s": 0.08,
+  "error": null,
+  "img": "neg",
+  "rep": 2
+ },
+ {
+  "idx": 21,
+  "cond": "grammar",
+  "http_status": 200,
+  "latency_s": 0.14,
+  "error": null,
+  "img": "neg",
+  "rep": 1
+ },
+ {
+  "idx": 22,
+  "cond": "grammar",
+  "http_status": 200,
+  "latency_s": 0.12,
+  "error": null,
+  "img": "neg",
+  "rep": 2
+ },
+ {
+  "idx": 23,
+  "cond": "response_format",
+  "http_status": 200,
+  "latency_s": 0.41,
+  "error": null,
+  "img": "neg",
+  "rep": 1
+ },
+ {
+  "idx": 24,
+  "cond": "response_format",
+  "http_status": 200,
+  "latency_s": 0.41,
+  "error": null,
+  "img": "neg",
+  "rep": 2
+ }
+]

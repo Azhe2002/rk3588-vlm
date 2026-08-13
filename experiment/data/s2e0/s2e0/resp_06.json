@@ -1,0 +1,8 @@
+{
+ "idx": 6,
+ "cond": "cache_off",
+ "http_status": 200,
+ "latency_s": 6.21,
+ "error": null,
+ "response": "{\"choices\":[{\"finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\" A industrial fan is on the corner of a shelf.\"}}],\"created\":1779659982,\"model\":\"/userdata/llama/models/SmolVLM-256M-Instruct-Q8_0.gguf\",\"system_fingerprint\":\"b1-7af4279\",\"object\":\"chat.completion\",\"usage\":{\"completion_tokens\":12,\"prompt_tokens\":148,\"total_tokens\":160,\"prompt_tokens_details\":{\"cached_tokens\":0}},\"id\":\"chatcmpl-ZBa4i9KgT31oV0eRJxGAyjFDNuW21YHn\",\"timings\":{\"cache_n\":0,\"prompt_n\":148,\"prompt_ms\":5939.188,\"prompt_per_token_ms\":40.12964864864865,\"prompt_per_second\":24.919231383145306,\"predicted_n\":12,\"predicted_ms\":199.911,\"predicted_per_token_ms\":16.65925,\"predicted_per_second\":60.02671188678963}}"
+}

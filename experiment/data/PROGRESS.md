@@ -152,3 +152,23 @@
 - frame_analysis.py — 帧特征分析（亮度/模糊/JPEG体积/帧间差/轮次相关性）
 - board_exp_run.sh — 板端实验运行器（起 server→rk3588-vlm→帧采样→杀 server; SAMPLE=1）
 - patches/ — 实验7/2/3 代码补丁 + 使用说明（已验证 git apply 干净）
+
+## Stage2（2026-08-13 完成，机制链闭合）
+- **S2-E0 能力探测**（24/24）：grammar/cache_prompt/seed/n_probs/response_format/usage 全部 supported（7af4279 实测）
+- **S2-E1 图文顺序消融 2×2**（80 配对请求, 负场景 gt=no + 正场景 gt=yes）：
+  - text→image：两场景均 0/20 单词、100% 描述句；负场景 20/20 幻觉风扇存在（确认幻觉）
+  - image→text：两场景 40/40 单词且语义全对（McNemar p=1.9e-6）
+  - 结论：历史"静态vs实时"差异主要是顺序混杂；部署须 image 前置（v0.3 一行改动候选）
+- **S2-E2-RES image→text 分辨率重扫**（256M 120 请求 + 500M 120 请求 + 500M@160 稳定重跑 20 请求）：
+  - 两模型全 6 分辨率 format_word 100%；≥320 语义全对——历史"分辨率崩塌"完全消失
+  - 160×120 呈现规模相关感知阈值：256M 全 No（诚实感知失败）vs 500M 全 Yes（双稳定场景验证）
+  - 500M@160 首跑污染事件：帧差检测（8.99 vs 基线 <2）确认采集期人为运动 → 稳定重跑 20/20 Yes
+- **历史日志修复**：exp5_A 双版本恢复（s1 15/33 + s2 3/32）；metrics.py 修正指标（22/22 测试）；45 组重算 → results_corrected.csv；EXPERIMENT-LOG.md（环境/时间线/9 项审计）
+- **paper.md v0.5**：机制重述版（标题改为 Content Order, Not Resolution...；顺序主效应 + 确认幻觉 + 分辨率崩塌证伪 + 污染事件方法论记录）
+- 数据：data/s2e0|s2e1|s2e1pos|s2e2res|s2e2res500|s2e2res500r/；帧 tgz 仅本地（.gitignore）
+
+## 下一步候选（用户休息后继续）
+1. S2-E5 受限解码（grammar 已可用）：text→image 部署兼容方案，正负样本 × 320/640 × constrained/unconstrained
+2. v0.3 改 C 客户端 content 顺序（image 前置, 一行改动）+ 在线复测
+3. σ sham 对照（videoconvert 双转换零模糊）解耦管线效应
+4. 多 session 随机区组复现（跨会话漂移 9-67% 建模）

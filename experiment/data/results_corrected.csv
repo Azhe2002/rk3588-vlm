@@ -1,0 +1,46 @@
+file,model,resolution,q_tag,temp,gst,rounds,format_exact,format_word,sem_yes,sem_no,sem_unknown,ground_truth,sem_correct,lat_mean
+exp1_256_1280x960.log,SmolVLM-256M-Instruct-Q8_0.gguf,1280x960,A,,,32,0,1,32,0,0,yes,32,5.8
+exp1_256_160x120.log,SmolVLM-256M-Instruct-Q8_0.gguf,160x120,A,,,34,0,34,0,34,0,yes,0,5.4
+exp1_256_480x360.log,SmolVLM-256M-Instruct-Q8_0.gguf,480x360,A,,,33,0,33,33,0,0,yes,33,5.5
+exp1_256_800x600.log,SmolVLM-256M-Instruct-Q8_0.gguf,800x600,A,,,32,0,0,32,0,0,yes,32,5.7
+exp1_500_1280x960.log,SmolVLM-500M-Instruct-Q8_0.gguf,1280x960,A,,,27,0,0,26,0,1,yes,26,6.9
+exp1_500_160x120.log,SmolVLM-500M-Instruct-Q8_0.gguf,160x120,A,,,29,0,29,1,28,0,yes,1,6.2
+exp1_500_480x360.log,SmolVLM-500M-Instruct-Q8_0.gguf,480x360,A,,,29,0,24,9,20,0,yes,9,6.3
+exp1_500_800x600.log,SmolVLM-500M-Instruct-Q8_0.gguf,800x600,A,,,27,0,0,25,0,2,yes,25,6.8
+exp2_B_scale320.log,SmolVLM-256M-Instruct-Q8_0.gguf,640x480,A,0.1,"videoscale ! video/x-raw,width=320,height=240",33,0,33,33,0,0,yes,33,5.5
+exp2_C_upscale640.log,SmolVLM-256M-Instruct-Q8_0.gguf,320x240,A,0.1,"videoscale ! video/x-raw,width=640,height=480",33,0,33,33,0,0,yes,33,5.5
+exp2_D_crop320.log,SmolVLM-256M-Instruct-Q8_0.gguf,640x480,A,0.1,videocrop left=160 right=160 top=120 bottom=120,33,0,33,33,0,0,yes,33,5.5
+exp3_B1_blur3.log,SmolVLM-256M-Instruct-Q8_0.gguf,640x480,A,0.1,videoconvert ! gaussianblur sigma=3 ! videoconvert,32,0,32,28,4,0,yes,28,5.7
+exp3_B2_blur7.log,SmolVLM-256M-Instruct-Q8_0.gguf,640x480,A,0.1,videoconvert ! gaussianblur sigma=7 ! videoconvert,30,0,30,0,30,0,yes,0,6.0
+exp3_B3_blur15.log,SmolVLM-256M-Instruct-Q8_0.gguf,640x480,A,0.1,videoconvert ! gaussianblur sigma=15 ! videoconvert,28,0,28,0,28,0,yes,0,6.5
+exp3_B4_blur1.log,SmolVLM-256M-Instruct-Q8_0.gguf,640x480,A,0.1,videoconvert ! gaussianblur sigma=1 ! videoconvert,32,0,32,32,0,0,yes,32,5.6
+exp3_B5_blur2.log,SmolVLM-256M-Instruct-Q8_0.gguf,640x480,A,0.1,videoconvert ! gaussianblur sigma=2 ! videoconvert,32,0,32,32,0,0,yes,32,5.7
+exp3_B6_blur4.log,SmolVLM-256M-Instruct-Q8_0.gguf,640x480,A,0.1,videoconvert ! gaussianblur sigma=4 ! videoconvert,31,0,31,29,2,0,yes,29,5.8
+exp3_B7_blur5.log,SmolVLM-256M-Instruct-Q8_0.gguf,640x480,A,0.1,videoconvert ! gaussianblur sigma=5 ! videoconvert,31,0,31,10,21,0,yes,10,5.8
+exp3_C_tex160.log,SmolVLM-256M-Instruct-Q8_0.gguf,640x480,A,0.1,"videoscale ! video/x-raw,width=160,height=120 ! videoscale ! video/x-raw,width=640,height=480",33,0,33,33,0,0,yes,33,5.5
+exp5_A_256_640_ctrl.log,SmolVLM-256M-Instruct-Q8_0.gguf,640x480,A,,,32,0,3,32,0,0,yes,32,5.6
+exp5_A_256_640_s1_0811.log,SmolVLM-256M-Instruct-Q8_0.gguf,640x480,A,,,33,0,15,33,0,0,yes,33,5.6
+exp5_A_256_640_s2_0812.log,SmolVLM-256M-Instruct-Q8_0.gguf,640x480,A,,,32,0,3,32,0,0,yes,32,5.6
+exp5_B_256_640.log,SmolVLM-256M-Instruct-Q8_0.gguf,640x480,B,,,33,0,1,33,0,0,yes,33,5.6
+exp5_C_256_640.log,SmolVLM-256M-Instruct-Q8_0.gguf,640x480,C,,,33,0,11,33,0,0,yes,33,5.5
+exp5_D_256_640.log,SmolVLM-256M-Instruct-Q8_0.gguf,640x480,D,,,33,0,27,33,0,0,yes,33,5.5
+exp5_E_256_640.log,SmolVLM-256M-Instruct-Q8_0.gguf,640x480,E,,,32,0,3,32,0,0,yes,32,5.7
+exp5_F_256_640.log,SmolVLM-256M-Instruct-Q8_0.gguf,640x480,F,,,32,0,5,32,0,0,yes,32,5.7
+exp5_G_500_320.log,SmolVLM-500M-Instruct-Q8_0.gguf,320x240,A,,,39,0,39,37,2,0,yes,37,6.2
+exp7_256_640_t0p0.log,SmolVLM-256M-Instruct-Q8_0.gguf,640x480,A,0.0,,33,0,28,33,0,0,yes,33,5.5
+exp7_256_640_t0p1.log,SmolVLM-256M-Instruct-Q8_0.gguf,640x480,A,0.1,,33,0,22,33,0,0,yes,33,5.5
+exp7_256_640_t0p5.log,SmolVLM-256M-Instruct-Q8_0.gguf,640x480,A,0.5,,33,0,13,33,0,0,yes,33,5.6
+exp7_256_640_t1p0.log,SmolVLM-256M-Instruct-Q8_0.gguf,640x480,A,1.0,,33,0,13,33,0,0,yes,33,5.6
+exp7_500_640_t0p0.log,SmolVLM-500M-Instruct-Q8_0.gguf,640x480,A,0.0,,28,0,0,28,0,0,yes,28,6.6
+exp7_500_640_t0p1.log,SmolVLM-500M-Instruct-Q8_0.gguf,640x480,A,0.1,,27,0,0,27,0,0,yes,27,6.7
+exp7_500_640_t0p5.log,SmolVLM-500M-Instruct-Q8_0.gguf,640x480,A,0.5,,27,0,0,24,1,2,yes,24,6.7
+exp7_500_640_t1p0.log,SmolVLM-500M-Instruct-Q8_0.gguf,640x480,A,1.0,,28,0,3,9,4,15,yes,9,6.6
+expA_256_320_sameS.log,SmolVLM-256M-Instruct-Q8_0.gguf,320x240,A,0.1,,33,0,33,33,0,0,yes,33,5.5
+expD_256_320x240.log,SmolVLM-256M-Instruct-Q8_0.gguf,320x240,D,0.1,,33,0,33,4,29,0,yes,4,5.5
+expD_256_480x360.log,SmolVLM-256M-Instruct-Q8_0.gguf,480x360,D,0.1,,33,0,33,33,0,0,yes,33,5.5
+expD_256_640_sameS.log,SmolVLM-256M-Instruct-Q8_0.gguf,640x480,D,0.1,,33,0,33,33,0,0,yes,33,5.5
+expD_256_800x600.log,SmolVLM-256M-Instruct-Q8_0.gguf,800x600,D,0.1,,33,0,33,33,0,0,yes,33,5.5
+exp_256_320.log,SmolVLM-256M-Instruct-Q8_0.gguf,320x240,A,,,45,0,45,45,0,0,yes,45,5.4
+exp_256_640.log,SmolVLM-256M-Instruct-Q8_0.gguf,640x480,A,,,44,0,16,44,0,0,yes,44,5.6
+exp_500_320.log,SmolVLM-500M-Instruct-Q8_0.gguf,320x240,A,,,39,0,39,16,23,0,yes,16,6.2
+exp_500_640.log,SmolVLM-500M-Instruct-Q8_0.gguf,640x480,A,,,36,0,0,36,0,0,yes,36,6.7

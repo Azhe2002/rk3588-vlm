@@ -1,0 +1,8 @@
+{
+ "idx": 3,
+ "cond": "seed",
+ "http_status": 200,
+ "latency_s": 0.35,
+ "error": null,
+ "response": "{\"choices\":[{\"finish_reason\":\"stop\",\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\" A industrial fan is on the shelf in the middle of the image.\"}}],\"created\":1779659969,\"model\":\"/userdata/llama/models/SmolVLM-256M-Instruct-Q8_0.gguf\",\"system_fingerprint\":\"b1-7af4279\",\"object\":\"chat.completion\",\"usage\":{\"completion_tokens\":15,\"prompt_tokens\":148,\"total_tokens\":163,\"prompt_tokens_details\":{\"cached_tokens\":147}},\"id\":\"chatcmpl-SpvNaRQ9zfnozjf1dgfX2bZsgpwyK5fr\",\"timings\":{\"cache_n\":147,\"prompt_n\":1,\"prompt_ms\":27.778,\"prompt_per_token_ms\":27.778,\"prompt_per_second\":35.99971200230398,\"predicted_n\":15,\"predicted_ms\":249.231,\"predicted_per_token_ms\":16.6154,\"predicted_per_second\":60.18512945821347}}"
+}
