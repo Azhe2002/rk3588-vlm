@@ -1,0 +1,41 @@
+diff --git a/llama_server.c b/llama_server.c
+index 79c9e52..fa75ba4 100644
+--- a/llama_server.c
++++ b/llama_server.c
+@@ -393,19 +393,21 @@ char* llama_infer(llama_handle_t handle,
+ 
+     // OpenAI 兼容格式: image_url 用 data URI 内嵌 base64
+     // temperature 由 llama_init 传入 (默认 0.1, 实验7 通过 --temp 扫描)
++    // v0.3: 图文顺序改为 image 在前 (image→text)。S2-E1 同帧配对消融 (p=1.9e-6):
++    // text→image 100% 描述句 + 负场景 20/20 确认幻觉; image→text 100% 单词且语义全对。
+     snprintf(body, body_cap,
+         "{"
+           "\"messages\":["
+             "{\"role\":\"system\",\"content\":\"%s\"},"
+             "{\"role\":\"user\",\"content\":["
+-              "{\"type\":\"text\",\"text\":\"%s\"},"
+-              "{\"type\":\"image_url\",\"image_url\":{\"url\":\"data:image/jpeg;base64,%s\"}}"
++              "{\"type\":\"image_url\",\"image_url\":{\"url\":\"data:image/jpeg;base64,%s\"}},"
++              "{\"type\":\"text\",\"text\":\"%s\"}"
+             "]}"
+           "],"
+           "\"temperature\":%.2f,"
+           "\"max_tokens\":16"
+         "}",
+-        sys_esc, usr_esc, b64, h->temperature);
++        sys_esc, b64, usr_esc, h->temperature);
+ 
+     free(b64);
+     free(sys_esc);
+diff --git a/main.c b/main.c
+index 1350d73..3ddadc2 100644
+--- a/main.c
++++ b/main.c
+@@ -242,6 +242,7 @@ int main(int argc, char** argv) {
+     printf("  分辨率: %dx%d\n", cfg.width, cfg.height);
+     printf("  间隔:   %ds\n", cfg.interval);
+     printf("  判定:   %s\n", cfg.strict ? "严格 yes/no" : "宽泛语义判定");
++    printf("  顺序:   image→text (v0.3, S2-E1 消融修复)\n");
+     printf("  温度:   %.2f\n", cfg.temp);
+     if (cfg.gst_extra[0] != '\0')
+         printf("  GStreamer 附加: %s\n", cfg.gst_extra);

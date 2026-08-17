@@ -1,4 +1,39 @@
-# 实验7 / 实验2/3 代码补丁说明 (2026-08-11, **2026-08-12 已应用**)
+# 板端代码补丁说明
+
+## v0.3: 图文顺序修复 (2026-08-17 生成, **未应用**)
+
+> 本补丁**只改一处请求体结构**：user content 数组改为 image 在前（image→text）。
+> **尚未应用，由用户自行 `git apply` 后编译推板（`bash build-arm64-docker.sh` →
+> 推 `/userdata/llama/bin/rk3588-vlm`）。** 推板后跑任意一组，banner 应显示
+> `顺序: image→text (v0.3, S2-E1 消融修复)` 以确认新二进制生效。
+
+```bash
+git apply experiment/patches/v03_image_first.patch
+```
+
+### 为什么改（S2-E1 证据，2026-08-13 同帧配对消融）
+
+| 顺序 | 负场景 (风扇不在) | 正场景 (风扇在) |
+|------|------------------|----------------|
+| text→image（旧 v0.2） | 0/20 单词；**20/20 幻觉** "There is a black industrial fan..." | 0/20 单词（描述句，语义正确） |
+| image→text（v0.3） | 20/20 单词 "No." | 20/20 单词 "Yes." |
+
+- McNemar p = 1.9×10⁻⁶；引导式提问（text 在前）压倒图像证据，**不只是格式问题，是确认幻觉/可靠性问题**
+- 详见 `experiment/data/s2e1/SESSION-REPORT-2x2.md`
+
+### 改动内容
+
+| 文件 | 改动 |
+|------|------|
+| `llama_server.c` | user content 数组 `[image_url, text]` 顺序（原 `[text, image_url]`）；snprintf 实参顺序同步调整 |
+| `main.c` | banner 增加 `顺序: image→text (v0.3, S2-E1 消融修复)` 行（推板后验证用） |
+
+> 注: S2-E5（grammar 受限解码）正在验证"不改顺序、用 grammar 硬保格式"的备选方案——
+> 若 S2-E5 显示 grammar 能同时保住语义（负场景给 "No."），v0.3 顺序修复与 grammar 方案可叠加决策。
+
+---
+
+## 实验7 / 实验2/3 代码补丁 (2026-08-11, **2026-08-12 已应用**)
 
 > 本补丁**只改实验所需的最小范围**，不改变既有行为（默认值与原来完全一致）。
 > **2026-08-12: 补丁已 git apply 到工作区源码（当前代码即 v0.2，含 --temp/--gst-extra）。**
